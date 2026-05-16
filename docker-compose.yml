@@ -5,7 +5,7 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_USER: pke
-      POSTGRES_PASSWORD: pke
+      POSTGRES_PASSWORD: pke  # pragma: allowlist secret
       POSTGRES_DB: pke
     volumes:
       - pgdata:/var/lib/postgresql/data
