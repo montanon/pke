@@ -59,6 +59,9 @@ ehthumbs.db
 *.swo
 *~
 
+# Claude Code — personal settings stay local
+.claude/settings.local.json
+
 # Claude logs
 .claude_logs/
 
