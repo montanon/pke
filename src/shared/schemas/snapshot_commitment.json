@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SnapshotCommitment",
+  "type": "object",
+  "required": [
+    "type",
+    "version",
+    "snapshot_id",
+    "ciphertext_hash",
+    "owner_signing_public_key",
+    "owner_encryption_public_key",
+    "capture_timestamp",
+    "metadata_policy",
+    "session_nonce",
+    "owner_signature"
+  ],
+  "properties": {
+    "type": { "const": "snapshot_commitment" },
+    "version": { "type": "string" },
+    "snapshot_id": { "type": "string" },
+    "ciphertext_hash": { "type": "string" },
+    "owner_signing_public_key": { "type": "string" },
+    "owner_encryption_public_key": { "type": "string" },
+    "capture_timestamp": { "type": "string", "format": "date-time" },
+    "metadata_policy": {
+      "type": "object",
+      "properties": {
+        "location_public": { "type": "boolean" },
+        "location_precision": { "type": "string" },
+        "media_type": { "type": "string" }
+      },
+      "required": ["location_public", "media_type"]
+    },
+    "session_nonce": { "type": "string" },
+    "owner_signature": { "type": "string" }
+  },
+  "additionalProperties": false
+}

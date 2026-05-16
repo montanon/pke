@@ -1,0 +1,16 @@
+{
+  "type": "witness_attestation",
+  "version": "0.1",
+  "snapshot_id": "snap_test_001",
+  "ciphertext_hash": "sha256_test_hash_001",
+  "session_nonce": "session_nonce_test_001",
+  "owner_signing_public_key": "owner_test_signing_public_key_001",
+  "witness_signing_public_key": "witness_test_signing_public_key_001",
+  "witness_timestamp": "2026-05-15T00:00:30Z",
+  "transport": "multipeerconnectivity",
+  "proximity_claim": {
+    "method": "nearby_session",
+    "exact_location_public": false
+  },
+  "witness_signature": "witness_test_signature_001"
+}

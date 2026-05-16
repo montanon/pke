@@ -1,0 +1,12 @@
+{
+  "type": "key_grant",
+  "version": "0.1",
+  "grant_id": "grant_test_001",
+  "snapshot_id": "snap_test_001",
+  "recipient_encryption_public_key": "recipient_test_encryption_public_key_001",
+  "wrapped_snapshot_key": "wrapped_key_test_001",
+  "wrapping_algorithm": "example_hybrid_encryption_scheme",
+  "granted_by_signing_public_key": "owner_test_signing_public_key_001",
+  "grant_timestamp": "2026-05-15T00:01:00Z",
+  "grant_signature": "grant_test_signature_001"
+}

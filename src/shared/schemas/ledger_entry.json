@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LedgerEntry",
+  "type": "object",
+  "required": [
+    "type",
+    "version",
+    "ledger_entry_id",
+    "event_type",
+    "snapshot_id",
+    "payload_hash",
+    "previous_entry_hash",
+    "entry_timestamp",
+    "entry_hash"
+  ],
+  "properties": {
+    "type": { "const": "ledger_entry" },
+    "version": { "type": "string" },
+    "ledger_entry_id": { "type": "string" },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "SNAPSHOT_COMMITTED",
+        "WITNESS_ATTESTED",
+        "KEY_GRANTED",
+        "REPORTED",
+        "FROZEN"
+      ]
+    },
+    "snapshot_id": { "type": "string" },
+    "payload_hash": { "type": "string" },
+    "previous_entry_hash": { "type": "string" },
+    "entry_timestamp": { "type": "string", "format": "date-time" },
+    "entry_hash": { "type": "string" }
+  },
+  "additionalProperties": false
+}

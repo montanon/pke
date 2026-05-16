@@ -1,0 +1,30 @@
+flowchart TB
+    subgraph IOS[iOS App]
+        Capture[Capture Service]
+        Identity[Device Identity]
+        Crypto[Crypto Service]
+        Attest[Attestation Service]
+        Verify[Verification Service]
+    end
+
+    subgraph Backend[Backend]
+        API[API Service]
+        Blob[Encrypted Blob Storage]
+        Ledger[Custody Ledger]
+        Keys[Key Grant Registry]
+        Registry[Public Identity Registry]
+        Reports[Report/Freeze Registry]
+    end
+
+    Capture --> Crypto
+    Identity --> Crypto
+    Crypto --> Attest
+    Crypto --> API
+    Attest --> API
+    API --> Blob
+    API --> Ledger
+    API --> Keys
+    API --> Registry
+    API --> Reports
+    Ledger --> Verify
+    Keys --> Verify

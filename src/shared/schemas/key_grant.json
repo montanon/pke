@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KeyGrant",
+  "type": "object",
+  "required": [
+    "type",
+    "version",
+    "grant_id",
+    "snapshot_id",
+    "recipient_encryption_public_key",
+    "wrapped_snapshot_key",
+    "wrapping_algorithm",
+    "granted_by_signing_public_key",
+    "grant_timestamp",
+    "grant_signature"
+  ],
+  "properties": {
+    "type": { "const": "key_grant" },
+    "version": { "type": "string" },
+    "grant_id": { "type": "string" },
+    "snapshot_id": { "type": "string" },
+    "recipient_encryption_public_key": { "type": "string" },
+    "wrapped_snapshot_key": { "type": "string" },
+    "wrapping_algorithm": { "type": "string" },
+    "granted_by_signing_public_key": { "type": "string" },
+    "grant_timestamp": { "type": "string", "format": "date-time" },
+    "grant_signature": { "type": "string" }
+  },
+  "additionalProperties": false
+}

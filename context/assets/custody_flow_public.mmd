@@ -1,0 +1,9 @@
+flowchart LR
+    A[Capture on iPhone] --> B[Encrypt Locally]
+    B --> C[Hash Ciphertext]
+    C --> D[Owner Signs Commitment]
+    D --> E[Nearby Witness Signs]
+    E --> F[Append Custody Ledger]
+    F --> G[Grant Recipient Key]
+    G --> H[Recipient Verifies]
+    H --> I[Recipient Decrypts Locally]

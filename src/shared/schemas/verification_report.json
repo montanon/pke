@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VerificationReport",
+  "type": "object",
+  "required": ["type", "version", "snapshot_id", "results", "limitations"],
+  "properties": {
+    "type": { "const": "verification_report" },
+    "version": { "type": "string" },
+    "snapshot_id": { "type": "string" },
+    "results": {
+      "type": "object",
+      "properties": {
+        "ciphertext_hash_verified": { "type": "boolean" },
+        "owner_signature_verified": { "type": "boolean" },
+        "witness_signatures_verified": { "type": "boolean" },
+        "ledger_hash_chain_verified": { "type": "boolean" },
+        "recipient_key_grant_verified": { "type": "boolean" }
+      },
+      "required": [
+        "ciphertext_hash_verified",
+        "owner_signature_verified",
+        "witness_signatures_verified",
+        "ledger_hash_chain_verified",
+        "recipient_key_grant_verified"
+      ]
+    },
+    "attestation_summary": {
+      "type": "object",
+      "properties": {
+        "witness_count": { "type": "integer", "minimum": 0 },
+        "transport": { "type": "string" },
+        "attestation_strength": {
+          "type": "string",
+          "enum": ["none", "low", "medium", "high"]
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

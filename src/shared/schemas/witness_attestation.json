@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WitnessAttestation",
+  "type": "object",
+  "required": [
+    "type",
+    "version",
+    "snapshot_id",
+    "ciphertext_hash",
+    "session_nonce",
+    "owner_signing_public_key",
+    "witness_signing_public_key",
+    "witness_timestamp",
+    "transport",
+    "proximity_claim",
+    "witness_signature"
+  ],
+  "properties": {
+    "type": { "const": "witness_attestation" },
+    "version": { "type": "string" },
+    "snapshot_id": { "type": "string" },
+    "ciphertext_hash": { "type": "string" },
+    "session_nonce": { "type": "string" },
+    "owner_signing_public_key": { "type": "string" },
+    "witness_signing_public_key": { "type": "string" },
+    "witness_timestamp": { "type": "string", "format": "date-time" },
+    "transport": { "type": "string" },
+    "proximity_claim": {
+      "type": "object",
+      "properties": {
+        "method": { "type": "string" },
+        "exact_location_public": { "type": "boolean" }
+      },
+      "required": ["method", "exact_location_public"]
+    },
+    "witness_signature": { "type": "string" }
+  },
+  "additionalProperties": false
+}

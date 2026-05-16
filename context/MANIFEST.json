@@ -1,0 +1,28 @@
+{
+  "folder": "/context",
+  "publication_status": "public-safe draft",
+  "markdown_files": [
+    "00_project_summary.md",
+    "01_problem_statement.md",
+    "02_product_principles.md",
+    "03_system_architecture.md",
+    "04_protocol_overview.md",
+    "05_data_model_public.md",
+    "06_threat_model.md",
+    "07_privacy_and_abuse.md",
+    "08_security_assumptions.md",
+    "09_mvp_scope.md",
+    "10_roadmap.md",
+    "11_demo_scenarios.md",
+    "12_glossary.md",
+    "13_publication_checklist.md",
+    "14_security_reporting.md",
+    "15_implementation_notes_public.md",
+    "README.md"
+  ],
+  "safety_notes": [
+    "All examples use synthetic placeholder values.",
+    "No real media, keys, locations, credentials, or device identifiers are included.",
+    "Manual review is still required before publishing."
+  ]
+}
