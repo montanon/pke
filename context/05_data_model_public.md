@@ -26,7 +26,9 @@ All examples use fake placeholder values.
 
 ## Snapshot Bundle
 
-The snapshot bundle is encrypted locally before upload. Plaintext bundles must not be stored in the backend or committed to the public repository.
+The snapshot bundle is encrypted locally before upload using a per-snapshot symmetric key with AES-256-GCM (on iOS: CryptoKit `AES.GCM`). The encrypted bundle (ciphertext) is then hashed with SHA-256 to produce the `ciphertext_hash`. The per-snapshot key is never sent to the backend in plaintext; it is wrapped for authorized recipients via key grants.
+
+Plaintext bundles must not be stored in the backend or committed to the public repository.
 
 ```json
 {
@@ -65,6 +67,10 @@ The snapshot bundle is encrypted locally before upload. Plaintext bundles must n
 
 ## Ledger Entry
 
+The `event_type` must be one of: `SNAPSHOT_COMMITTED`, `WITNESS_ATTESTED`, `KEY_GRANTED`, `REPORTED`, `FROZEN`.
+
+The `created_at` field in data models is the persistence-layer timestamp, corresponding to `entry_timestamp` in the protocol. Other protocol-level timestamps (`capture_timestamp`, `witness_timestamp`, `grant_timestamp`, `report_timestamp`, `freeze_timestamp`) are stored inside the event payload referenced by `payload_hash`.
+
 ```json
 {
   "ledger_entry_id": "ledger_entry_test_001",
@@ -97,10 +103,48 @@ The snapshot bundle is encrypted locally before upload. Plaintext bundles must n
   "snapshot_id": "snap_test_001",
   "recipient_encryption_public_key": "recipient_test_encryption_public_key_001",
   "wrapped_snapshot_key": "wrapped_snapshot_key_test_001",
-  "wrapping_algorithm": "example_hybrid_encryption_scheme",
+  "wrapping_algorithm": "ecdhp256+aesgcm256",
+  "granted_by_signing_public_key": "owner_test_signing_public_key_001",
   "grant_status": "active",
   "created_at": "2026-05-15T00:01:00Z",
   "grant_signature": "grant_test_signature_001"
+}
+```
+
+### Wrapping algorithm guidance
+
+The `wrapping_algorithm` field identifies the cryptographic construction used to wrap the per-snapshot key for a recipient. The MVP guidance is ECDH key agreement (P-256) to derive a shared secret, HKDF to derive a wrapping key, and AES-256-GCM to wrap the snapshot key. On iOS, this maps to CryptoKit `P256.KeyAgreement` and `AES.GCM`. The identifier `"ecdhp256+aesgcm256"` represents this construction.
+
+## Report
+
+A report is a metadata-level action that flags a snapshot for review. It does not require backend decryption.
+
+```json
+{
+  "report_id": "report_test_001",
+  "snapshot_id": "snap_test_001",
+  "reason_category": "abuse_concern",
+  "reported_by_signing_public_key": "reporter_test_signing_public_key_001",
+  "report_status": "pending",
+  "created_at": "2026-05-15T00:02:00Z",
+  "report_signature": "report_test_signature_001"
+}
+```
+
+The `reason_category` may be one of: `abuse_concern`, `legal_request`, `owner_request`, `other`.
+
+## Freeze
+
+A freeze restricts future key grants for a reported snapshot. Existing custody metadata and encrypted blobs are preserved.
+
+```json
+{
+  "freeze_id": "freeze_test_001",
+  "snapshot_id": "snap_test_001",
+  "triggered_by": "report_test_001",
+  "freeze_status": "active",
+  "created_at": "2026-05-15T00:02:05Z",
+  "freeze_signature": "freeze_test_signature_001"
 }
 ```
 
