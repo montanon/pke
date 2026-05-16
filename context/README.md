@@ -22,6 +22,7 @@ The folder is safe for publication only if it remains limited to public architec
 - Publication checklist
 - Security reporting guidance
 - Public implementation notes (cryptographic specifics, identity lifecycle, timestamps)
+- Canonical encoding spec (canonical JSON, ECDSA, AES-GCM, HKDF, hash chain, v0.1 versioning)
 - Synthetic JSON payload examples (`examples/`)
 - Mermaid architecture diagrams (`assets/`)
 
@@ -45,6 +46,7 @@ The folder is safe for publication only if it remains limited to public architec
 | `13_publication_checklist.md` | Review checklist before publishing |
 | `14_security_reporting.md` | Security and abuse reporting procedures |
 | `15_implementation_notes_public.md` | Cryptographic specifics, identity lifecycle, timestamp handling, repo hygiene |
+| `16_canonical_encoding.md` | v0.1 canonical-encoding spec: canonical JSON, base64url, ECDSA P1363, AES-GCM, HKDF, AEAD AAD, hash chain, versioning |
 
 ## What this folder must not include
 
