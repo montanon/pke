@@ -45,6 +45,7 @@ The folder is safe for publication only if it remains limited to public architec
 | `13_publication_checklist.md` | Review checklist before publishing |
 | `14_security_reporting.md` | Security and abuse reporting procedures |
 | `15_implementation_notes_public.md` | Cryptographic specifics, identity lifecycle, timestamp handling, repo hygiene |
+| `16_canonical_encoding.md` | Canonical encoding rules (canonical JSON, base64url, ECDSA P1363, AES-GCM, HKDF, hash chain) |
 
 ## What this folder must not include
 
