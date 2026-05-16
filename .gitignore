@@ -32,6 +32,10 @@ Pods/
 *.perspectivev3
 xcuserdata/
 
+# SwiftPM
+.swiftpm/
+src/ios/.build/
+
 # Secrets — NEVER commit these
 .env
 .env.*
