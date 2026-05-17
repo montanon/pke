@@ -25,6 +25,7 @@ The folder is safe for publication only if it remains limited to public architec
 - Canonical encoding spec (canonical JSON, ECDSA, AES-GCM, HKDF, hash chain, v0.1 versioning)
 - Synthetic JSON payload examples (`examples/`)
 - Mermaid architecture diagrams (`assets/`)
+- Shared JSON Schemas for protocol payloads (`src/shared/schemas/`)
 
 ## File index
 
@@ -47,6 +48,20 @@ The folder is safe for publication only if it remains limited to public architec
 | `14_security_reporting.md` | Security and abuse reporting procedures |
 | `15_implementation_notes_public.md` | Cryptographic specifics, identity lifecycle, timestamp handling, repo hygiene |
 | `16_canonical_encoding.md` | v0.1 canonical-encoding spec: canonical JSON, base64url, ECDSA P1363, AES-GCM, HKDF, AEAD AAD, hash chain, versioning |
+
+## Shared schemas
+
+Authoritative JSON Schemas for protocol payloads live in `src/shared/schemas/`. Each file is JSON Schema draft 2020-12 with `additionalProperties: false`. The synthetic `examples/` files in this folder validate against the matching schema.
+
+| Schema | Purpose |
+|------|---------|
+| `src/shared/schemas/snapshot_commitment.json` | `SNAPSHOT_COMMITTED` payload — encrypted snapshot commitment |
+| `src/shared/schemas/witness_attestation.json` | `WITNESS_ATTESTED` payload — nearby-witness signed attestation |
+| `src/shared/schemas/ledger_entry.json` | Append-only custody ledger entry (any of the 5 `event_type` values) |
+| `src/shared/schemas/key_grant.json` | `KEY_GRANTED` payload — owner-wrapped snapshot key for a recipient |
+| `src/shared/schemas/verification_report.json` | Verification report returned by the verifier |
+| `src/shared/schemas/report.json` | `REPORTED` payload — metadata-level snapshot report (abuse / legal / owner / other) |
+| `src/shared/schemas/freeze.json` | `FROZEN` payload — restricts future key grants for a reported snapshot |
 
 ## What this folder must not include
 
