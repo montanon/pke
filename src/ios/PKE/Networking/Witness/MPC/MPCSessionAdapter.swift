@@ -45,7 +45,13 @@ public actor MPCSessionAdapter {
 
     /// Typed events emitted by every MPC delegate callback. Consumers
     /// (HLAM-158 / HLAM-159) iterate `events` and pattern-match.
-    public enum Event: Sendable {
+    ///
+    /// Declared `@unchecked Sendable` because the MPC framework types
+    /// (`MCPeerID`, `MCSessionState`) and `any Error` are not themselves
+    /// `Sendable`; the values flow from MPC's internal threads through
+    /// the `AsyncStream` continuation, which is itself thread-safe and
+    /// is the only synchronisation point on this path.
+    public enum Event: @unchecked Sendable {
         case peerStateChanged(peerID: MCPeerID, state: MCSessionState)
         case dataReceived(peerID: MCPeerID, data: Data)
         case foundPeer(peerID: MCPeerID, discoveryInfo: [String: String]?)

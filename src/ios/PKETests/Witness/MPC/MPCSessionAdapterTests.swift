@@ -247,34 +247,24 @@ private extension MPCSessionAdapterTests {
         )
     }
 
-    /// Drains the first event from `events` with a generous timeout so
-    /// scheduler hiccups on CI do not flake the test.
+    /// Drains the first event from `events`. The bridge yields
+    /// synchronously inside its delegate callbacks, so by the time the
+    /// caller awaits `iterator.next()` the event is already in the
+    /// stream's buffer — no explicit timeout is needed. Returning `nil`
+    /// here only happens if the stream itself finished, which the
+    /// caller treats as a test failure.
     func firstEvent(
-        from events: AsyncStream<MPCSessionAdapter.Event>,
-        timeoutNanos: UInt64 = 2_000_000_000
+        from events: AsyncStream<MPCSessionAdapter.Event>
     ) async throws -> MPCSessionAdapter.Event {
-        try await withThrowingTaskGroup(of: MPCSessionAdapter.Event?.self) { group in
-            group.addTask {
-                var iterator = events.makeAsyncIterator()
-                return await iterator.next()
-            }
-            group.addTask {
-                try await Task.sleep(nanoseconds: timeoutNanos)
-                return nil
-            }
-            for try await result in group {
-                group.cancelAll()
-                if let result {
-                    return result
-                }
-                throw EventTimeout()
-            }
-            throw EventTimeout()
+        var iterator = events.makeAsyncIterator()
+        guard let event = await iterator.next() else {
+            throw StreamFinishedBeforeYield()
         }
+        return event
     }
 }
 
-private struct EventTimeout: Error {}
+private struct StreamFinishedBeforeYield: Error {}
 
 /// Locked counter so the invitation-handler probe is observable from
 /// the test thread without a race.
