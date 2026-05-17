@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 import pytest
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 
@@ -138,34 +138,39 @@ def _load_vector(name: str) -> dict[str, object]:
     return json.loads((VECTORS_DIR / name).read_text())
 
 
-def _pub_from_uncompressed(hex_pub: str) -> ec.EllipticCurvePublicKey:
-    raw = bytes.fromhex(hex_pub)
-    return serialization.load_der_public_key(
-        ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), raw).public_bytes(
-            encoding=serialization.Encoding.DER,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-    )  # type: ignore[return-value]
+def _pub_from_vector(inputs: dict[str, object]) -> ec.EllipticCurvePublicKey:
+    raw = bytes.fromhex(str(inputs["public_key_uncompressed_hex"]))
+    return ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), raw)
 
 
-def test_vector_verify_valid_p1363() -> None:
-    bundle = _load_vector("verify-valid-p1363.json")
+POSITIVE_VECTORS = ("p1-snapshot-commit.json", "p2-attestation.json", "p3-binary-payload.json")
+
+
+@pytest.mark.parametrize("vector", POSITIVE_VECTORS)
+def test_vector_positive_validates(vector: str) -> None:
+    bundle = _load_vector(vector)
     assert bundle["valid"] is True
     inputs = bundle["inputs"]
+    expected = bundle["expected"]
     assert isinstance(inputs, dict)
-    pub = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), bytes.fromhex(inputs["public_key_uncompressed"]))
-    payload = bytes.fromhex(inputs["payload"])
-    sig = bytes.fromhex(inputs["signature_p1363"])
-    assert verify_signature(pub, payload, sig) is None
+    assert isinstance(expected, dict)
+    pub = _pub_from_vector(inputs)
+    message = bytes.fromhex(str(inputs["message_hex"]))
+    sig = bytes.fromhex(str(expected["signature_p1363_hex"]))
+    assert verify_signature(pub, message, sig) is None
 
 
-def test_vector_verify_der_rejected_as_format_error() -> None:
-    bundle = _load_vector("verify-der-rejected.json")
+def test_vector_negative_flipped_signature_fails_verification() -> None:
+    bundle = _load_vector("n1-flipped-signature.json")
     assert bundle["valid"] is False
     inputs = bundle["inputs"]
+    expected = bundle["expected"]
     assert isinstance(inputs, dict)
-    pub = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), bytes.fromhex(inputs["public_key_uncompressed"]))
-    payload = bytes.fromhex(inputs["payload"])
-    der_sig = bytes.fromhex(inputs["signature_der"])
-    with pytest.raises(SignatureFormatError):
-        verify_signature(pub, payload, der_sig)
+    assert isinstance(expected, dict)
+    pub = _pub_from_vector(inputs)
+    message = bytes.fromhex(str(inputs["message_hex"]))
+    sig = bytes.fromhex(str(expected["signature_p1363_hex"]))
+    # Sig is still 64 bytes (format-valid) so verification math runs and fails.
+    assert len(sig) == 64
+    with pytest.raises(SignatureVerificationError):
+        verify_signature(pub, message, sig)

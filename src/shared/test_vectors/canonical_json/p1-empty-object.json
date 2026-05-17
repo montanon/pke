@@ -1,0 +1,10 @@
+{
+  "name": "p1-empty-object",
+  "inputs": {
+    "value": {}
+  },
+  "expected": {
+    "canonical_bytes_hex": "7b7d"
+  },
+  "valid": true
+}

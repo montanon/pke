@@ -1,0 +1,10 @@
+{
+  "name": "p2-short-abc",
+  "inputs": {
+    "message_hex": "616263"
+  },
+  "expected": {
+    "digest_hex": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  },
+  "valid": true
+}

@@ -111,33 +111,60 @@ def _load_vector(name: str) -> dict[str, object]:
     return json.loads((VECTORS_DIR / name).read_text())
 
 
-def test_vector_keywrap_positive() -> None:
-    bundle = _load_vector("derive-keywrap-32.json")
+def _build_info(snapshot_id: str, recipient_pub_hex: str) -> bytes:
+    sid = snapshot_id.encode("utf-8")
+    pub = bytes.fromhex(recipient_pub_hex)
+    return b"pke/v0.1/keywrap/info" + len(sid).to_bytes(2, "big") + sid + len(pub).to_bytes(2, "big") + pub
+
+
+POSITIVE_VECTORS = ("p1-snap0001-r1.json", "p2-snap0001-r2.json", "p3-snap0002-r1.json")
+
+
+@pytest.mark.parametrize("vector", POSITIVE_VECTORS)
+def test_vector_positive_keywrap_matches(vector: str) -> None:
+    """Each positive vector ships salt/info bytes and the expected OKM.
+
+    The contract: an implementation that ingests ``inputs`` and constructs
+    ``info`` per HLAM-3 must produce ``expected.info_hex`` byte-for-byte
+    and derive ``expected.okm_hex`` from that.
+    """
+    bundle = _load_vector(vector)
     assert bundle["valid"] is True
     inputs = bundle["inputs"]
     expected = bundle["expected"]
     assert isinstance(inputs, dict)
     assert isinstance(expected, dict)
-    out = hkdf_sha256(
-        bytes.fromhex(inputs["secret"]),
-        bytes.fromhex(inputs["salt"]),
-        bytes.fromhex(inputs["info"]),
-        int(inputs["length"]),
+    info = _build_info(str(inputs["snapshot_id"]), str(inputs["recipient_public_key_hex"]))
+    assert info.hex() == expected["info_hex"]
+    okm = hkdf_sha256(
+        bytes.fromhex(str(inputs["ikm_hex"])),
+        bytes.fromhex(str(expected["salt_hex"])),
+        info,
+        32,
     )
-    assert out.hex() == expected["okm"]
+    assert okm.hex() == expected["okm_hex"]
 
 
-def test_vector_wrong_info_mismatch() -> None:
-    bundle = _load_vector("derive-wrong-info-mismatch.json")
+def test_vector_negative_wrong_info_bytes_mismatches() -> None:
+    """n1 corrupts ``expected.info_hex`` while keeping the recorded ``okm_hex``
+    aligned with the matching positive. Rebuilding ``info`` from the clean
+    ``inputs`` MUST produce bytes that do NOT match the corrupted
+    ``expected.info_hex`` — surfacing the tamper.
+    """
+    bundle = _load_vector("n1-wrong-info-bytes.json")
     assert bundle["valid"] is False
     inputs = bundle["inputs"]
+    expected = bundle["expected"]
     assert isinstance(inputs, dict)
-    out = hkdf_sha256(
-        bytes.fromhex(inputs["secret"]),
-        bytes.fromhex(inputs["salt"]),
-        bytes.fromhex(inputs["info"]),
-        int(inputs["length"]),
+    assert isinstance(expected, dict)
+    info = _build_info(str(inputs["snapshot_id"]), str(inputs["recipient_public_key_hex"]))
+    assert info.hex() != expected["info_hex"]
+    okm = hkdf_sha256(
+        bytes.fromhex(str(inputs["ikm_hex"])),
+        bytes.fromhex(str(expected["salt_hex"])),
+        info,
+        32,
     )
-    # The contract: same secret/salt with mutated info produces different OKM
-    # than the reference (positive vector) OKM.
-    assert out.hex() != inputs["reference_okm"]
+    # OKM derived from clean inputs equals the recorded reference; only the
+    # corrupted info_hex diverges.
+    assert okm.hex() == expected["okm_hex"]

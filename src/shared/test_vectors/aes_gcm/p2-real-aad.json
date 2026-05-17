@@ -1,0 +1,15 @@
+{
+  "name": "p2-real-aad",
+  "inputs": {
+    "key_hex": "61e6f47c87123fbfca7383852a7703f4bd7b1ef6b1ba24bafa43d2db703d559e",
+    "nonce_hex": "e3e4c868ac4ff4e1c21d4ffb",
+    "aad_hex": "706b652f76302e312f6b6579777261702f6161640009736e61702d58595a41",
+    "plaintext_hex": "cf3218514993d2e647f66c4a2965dded3b906fea9c8c60b1a8b07037233c9032"
+  },
+  "expected": {
+    "ciphertext_hex": "82c48603dd8f02d6bef63e2db534a78225752f1b7f8a742cab58f12e76a8407c",
+    "tag_hex": "5fc5c29b21c9813d4a7fbd75c88a1a8b"
+  },
+  "valid": true,
+  "notes": "Nonce is fixed for determinism; production code MUST use a random nonce."
+}

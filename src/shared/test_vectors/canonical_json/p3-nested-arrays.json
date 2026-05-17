@@ -1,0 +1,24 @@
+{
+  "name": "p3-nested-arrays",
+  "inputs": {
+    "value": {
+      "outer": {
+        "y": [
+          1,
+          2,
+          {
+            "z": "deep",
+            "a": null
+          }
+        ],
+        "x": false
+      },
+      "alpha": "first"
+    }
+  },
+  "expected": {
+    "canonical_bytes_hex": "7b22616c706861223a226669727374222c226f75746572223a7b2278223a66616c73652c2279223a5b312c322c7b2261223a6e756c6c2c227a223a2264656570227d5d7d7d"
+  },
+  "valid": true,
+  "notes": "Nested key ordering applies recursively; array order is preserved."
+}

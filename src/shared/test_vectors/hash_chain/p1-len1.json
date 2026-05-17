@@ -1,0 +1,19 @@
+{
+  "name": "p1-len1",
+  "inputs": {
+    "chain": [
+      {
+        "seq": 0,
+        "payload_hash_hex": "86bce9d25a4884c67d1deaea258b52c8037f7b526f9eefb917eba2e5dfd5d624",
+        "previous_entry_hash_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ]
+  },
+  "expected": {
+    "entry_hashes_hex": [
+      "62adf7d9cfa675c6f9fc4d6c2c1541b54b83448c28148cc1cd03bc9c0e099533"
+    ]
+  },
+  "valid": true,
+  "notes": "entry_hash[i] = SHA256(canonical_json(entry_i)); entry_i includes previous_entry_hash_hex which is entry_hash[i-1] (or 32 zero bytes for genesis)."
+}
