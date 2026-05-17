@@ -6,9 +6,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from pke_backend.api.auth import router as auth_router
 from pke_backend.config import get_settings
 from pke_backend.db import dispose_engine, get_engine
-from pke_backend.security.errors import UnauthenticatedError, unauthenticated_handler
+from pke_backend.security.errors import (
+    DuplicateUsernameError,
+    InvalidCredentialsError,
+    UnauthenticatedError,
+    duplicate_username_handler,
+    invalid_credentials_handler,
+    unauthenticated_handler,
+)
 
 
 @asynccontextmanager
@@ -31,6 +39,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.add_exception_handler(UnauthenticatedError, unauthenticated_handler)
+    app.add_exception_handler(InvalidCredentialsError, invalid_credentials_handler)
+    app.add_exception_handler(DuplicateUsernameError, duplicate_username_handler)
+
+    app.include_router(auth_router)
 
     @app.get("/health")
     def health() -> dict[str, str]:
