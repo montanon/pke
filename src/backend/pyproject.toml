@@ -16,7 +16,7 @@ dependencies = [
     "uvicorn[standard]>=0.34",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",

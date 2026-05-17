@@ -28,24 +28,24 @@ let package = Package(
     name: "PKE",
     platforms: [
         .iOS(.v16),
-        .macOS(.v13),
+        .macOS(.v13)
     ],
     products: [
         .library(name: "PKECrypto", targets: ["PKECrypto"]),
         .library(name: "PKEProtocol", targets: ["PKEProtocol"]),
-        .library(name: "PKEIdentity", targets: ["PKEIdentity"]),
+        .library(name: "PKEIdentity", targets: ["PKEIdentity"])
     ],
     dependencies: [
         .package(
             url: "https://github.com/apple/swift-crypto.git",
             .upToNextMajor(from: "3.0.0")
-        ),
+        )
     ],
     targets: [
         .target(
             name: "PKECrypto",
             dependencies: [
-                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "Crypto", package: "swift-crypto")
             ],
             path: "PKE/Services/Crypto"
         ),
@@ -64,7 +64,7 @@ let package = Package(
             dependencies: ["PKECrypto"],
             path: "PKETests/Crypto",
             resources: [
-                .process("Resources"),
+                .process("Resources")
             ]
         ),
         .testTarget(
@@ -76,6 +76,6 @@ let package = Package(
             name: "PKEIdentityTests",
             dependencies: ["PKEIdentity"],
             path: "PKETests/Identity"
-        ),
+        )
     ]
 )
