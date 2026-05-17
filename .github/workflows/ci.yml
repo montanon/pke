@@ -103,3 +103,22 @@ jobs:
           restore-keys: |
             spm-linux-
       - run: make ios-test
+
+  ios-app:
+    name: iOS App Tests
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache SwiftPM artifacts (xcodebuild)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: xcodebuild-spm-${{ hashFiles('src/ios/Package.resolved') }}
+          restore-keys: |
+            xcodebuild-spm-
+      - name: Resolve package dependencies
+        run: xcodebuild -resolvePackageDependencies -project src/ios/PKE.xcodeproj -scheme PKE
+      - name: Build & test
+        run: make ios-app-test

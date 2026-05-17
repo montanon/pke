@@ -49,7 +49,7 @@ import PackageDescription
 let package = Package(
     name: "PKE",
     platforms: [
-        .iOS(.v16),
+        .iOS(.v17),
         .macOS(.v13)
     ],
     products: [
