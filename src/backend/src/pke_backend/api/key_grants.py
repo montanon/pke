@@ -1,15 +1,18 @@
-"""``GET /key-grants/{grant_id}`` + ``GET /key-grants`` endpoints (HLAM-75).
+"""Key-grant endpoints.
 
-Recipient-facing read surface. Two routes:
+* HLAM-75 — recipient-facing read surface:
+    * ``GET /key-grants/{grant_id}`` — single grant by primary identifier.
+    * ``GET /key-grants?recipient_encryption_public_key=<b64url>`` — all grants
+      addressed to the recipient pubkey, newest first.
+* HLAM-142 — owner-facing write surface:
+    * ``POST /snapshots/{snapshot_id}/key-grants`` — owner submits a signed
+      grant. Refused on frozen snapshots. Bearer-auth gated.
 
-* ``GET /key-grants/{grant_id}`` — single grant by primary identifier.
-* ``GET /key-grants?recipient_encryption_public_key=<b64url>`` — all grants
-  addressed to the recipient pubkey, newest first.
-
-Both routes are read-only and unauthenticated per
-``context/05_data_model_public.md``: the wrapped key bytes are encrypted
-to the recipient, so even an exhaustive scrape only yields ciphertext the
-recipient's device can decrypt.
+GET routes are unauthenticated per ``context/05_data_model_public.md`` — the
+wrapped key bytes are encrypted to the recipient, so an exhaustive scrape
+yields only ciphertext the recipient's device can decrypt. The POST route is
+bearer-gated for the same reason POSTs on the other custody routes are
+(HLAM-122 S8 precedent).
 """
 
 from __future__ import annotations
@@ -27,11 +30,15 @@ from pke_backend.crypto.errors import EncodingError
 from pke_backend.db import get_session
 from pke_backend.schemas.key_grant import (
     RECIPIENT_PUBLIC_KEY_BYTES,
+    KeyGrantCreatedResponse,
+    KeyGrantIn,
     KeyGrantListResponse,
     KeyGrantOut,
 )
+from pke_backend.security.dependencies import require_user
 from pke_backend.services.key_grants import (
     compute_grant_singleton_etag,
+    create_key_grant,
     get_grant_or_404,
     list_grants_for_recipient,
 )
@@ -137,4 +144,52 @@ async def list_key_grants(
         grants=[
             KeyGrantOut.from_persisted(row, ledger_hash) for row, ledger_hash in zip(rows, ledger_hashes, strict=True)
         ],
+    )
+
+
+# HLAM-142 lives on its own router so the `POST` path is rooted at
+# `/snapshots/{snapshot_id}/key-grants`, not under the `/key-grants` prefix
+# of the HLAM-75 reader router. The two routers stay siblings inside this
+# module so the key-grant contract remains visually grouped.
+post_router = APIRouter(tags=["key_grants"])
+
+
+def _parse_snapshot_uuid(value: str) -> uuid.UUID:
+    """Path-param parser — non-UUID becomes 404, matching HLAM-65 / HLAM-141."""
+    try:
+        return uuid.UUID(value)
+    except ValueError as exc:
+        raise HTTPError(404, "snapshot_not_found", "snapshot_id is not a valid UUID") from exc
+
+
+@post_router.post(
+    "/snapshots/{snapshot_id}/key-grants",
+    status_code=201,
+    response_model=KeyGrantCreatedResponse,
+    dependencies=[Depends(require_user)],
+    responses={
+        401: {"description": "unauthenticated"},
+        404: {"description": "snapshot_not_found"},
+        409: {"description": "snapshot_frozen | grant_conflict"},
+        422: {"description": "snapshot_mismatch | not_owner | invalid_payload"},
+    },
+)
+async def post_snapshot_key_grant(
+    snapshot_id: str,
+    grant: KeyGrantIn,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> KeyGrantCreatedResponse:
+    """Owner submits a signed ``KeyGrant`` for ``snapshot_id``.
+
+    Every domain rule (owner-signature verify, frozen-snapshot refusal,
+    snapshot-mismatch, INSERT-then-append ordering, ledger-chain dedup)
+    lives in :func:`pke_backend.services.key_grants.create_key_grant`. The
+    handler is intentionally thin.
+    """
+    snapshot_uuid = _parse_snapshot_uuid(snapshot_id)
+    row, entry = await create_key_grant(session, snapshot_uuid, grant)
+    return KeyGrantCreatedResponse(
+        grant_id=row.grant_id,
+        ledger_entry_id=entry.ledger_entry_id,
+        ledger_entry_hash=b64url_encode(entry.entry_hash),
     )

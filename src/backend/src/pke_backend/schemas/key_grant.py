@@ -41,6 +41,7 @@ __all__ = [
     "SIGNING_PUBLIC_KEY_BYTES",
     "WRAPPED_SNAPSHOT_KEY_BYTES",
     "WRAPPING_ALGORITHM_ALLOWLIST",
+    "KeyGrantCreatedResponse",
     "KeyGrantIn",
     "KeyGrantListResponse",
     "KeyGrantOut",
@@ -196,6 +197,24 @@ class KeyGrantOut(BaseModel):
             created_at=orm_row.created_at,
             ledger_entry_hash=hex_encode(ledger_entry_hash),
         )
+
+
+class KeyGrantCreatedResponse(BaseModel):
+    """``POST /snapshots/{id}/key-grants`` envelope (HLAM-142).
+
+    Mirrors :class:`pke_backend.schemas.reports.ReportCreatedResponse` /
+    :class:`pke_backend.schemas.freezes.FreezeCreatedResponse`: the new
+    resource id, the ledger anchor's ``ledger_entry_id``, and its
+    base64url-encoded ``entry_hash``. Knowledge of ``grant_id`` is the bearer
+    capability the recipient uses to pull their wrapped key via the HLAM-75
+    ``GET /key-grants/{grant_id}`` route.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    grant_id: uuid.UUID
+    ledger_entry_id: uuid.UUID
+    ledger_entry_hash: str
 
 
 class KeyGrantListResponse(BaseModel):

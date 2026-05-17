@@ -10,6 +10,7 @@ from pke_backend.api.attestations import router as attestations_router
 from pke_backend.api.auth import router as auth_router
 from pke_backend.api.errors import register_exception_handlers
 from pke_backend.api.freezes import router as freezes_router
+from pke_backend.api.key_grants import post_router as key_grants_post_router
 from pke_backend.api.key_grants import router as key_grants_router
 from pke_backend.api.reports import router as reports_router
 from pke_backend.api.snapshots import router as snapshots_router
@@ -60,6 +61,7 @@ def create_app() -> FastAPI:
     app.include_router(snapshots_router)
     app.include_router(attestations_router)
     app.include_router(key_grants_router)
+    app.include_router(key_grants_post_router)
 
     return app
 
