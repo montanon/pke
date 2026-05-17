@@ -25,6 +25,15 @@ public actor PKEHTTPClient {
     private let identity: DeviceIdentity
     private let session: URLSession
 
+    /// Internal accessor exposing the underlying `URLSession` so streaming
+    /// endpoints (HLAM-151's `fetchBlob`) can call `URLSession.bytes(for:)`
+    /// directly without funneling through `send(_:)` — `send(_:)` is the
+    /// buffered transport primitive and would defeat the streaming AC.
+    /// Deliberately narrow: returns the session only; no other state.
+    internal func sessionForStreaming() -> URLSession {
+        session
+    }
+
     /// Production initializer. Uses `URLSessionConfiguration.default` so ATS
     /// is enforced and no arbitrary-load exemptions are configured.
     public init(baseURL: URL, identity: DeviceIdentity) {
