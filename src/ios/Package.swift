@@ -33,7 +33,8 @@ let package = Package(
     products: [
         .library(name: "PKECrypto", targets: ["PKECrypto"]),
         .library(name: "PKEProtocol", targets: ["PKEProtocol"]),
-        .library(name: "PKEIdentity", targets: ["PKEIdentity"])
+        .library(name: "PKEIdentity", targets: ["PKEIdentity"]),
+        .library(name: "PKEWitness", targets: ["PKEWitness"])
     ],
     dependencies: [
         .package(
@@ -59,6 +60,10 @@ let package = Package(
             dependencies: ["PKECrypto"],
             path: "PKE/Services/Identity"
         ),
+        .target(
+            name: "PKEWitness",
+            path: "PKE/Networking/Witness"
+        ),
         .testTarget(
             name: "PKECryptoTests",
             dependencies: ["PKECrypto"],
@@ -76,6 +81,11 @@ let package = Package(
             name: "PKEIdentityTests",
             dependencies: ["PKEIdentity"],
             path: "PKETests/Identity"
+        ),
+        .testTarget(
+            name: "PKEWitnessTests",
+            dependencies: ["PKEWitness"],
+            path: "PKETests/Witness"
         )
     ]
 )
