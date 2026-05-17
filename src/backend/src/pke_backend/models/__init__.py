@@ -11,7 +11,9 @@ from pke_backend.models.attestation import (
     WITNESS_ATTESTATION_VERSION,
     WitnessAttestation,
 )
+from pke_backend.models.freeze import FREEZE_VERSION, Freeze
 from pke_backend.models.ledger import LEDGER_VERSION, EventType, LedgerEntry
+from pke_backend.models.report import REPORT_VERSION, ReasonCategory, Report
 from pke_backend.models.snapshot import (
     CIPHERTEXT_HASH_BYTES,
     SESSION_NONCE_BYTES,
@@ -21,12 +23,17 @@ from pke_backend.models.snapshot import (
 
 __all__ = [
     "CIPHERTEXT_HASH_BYTES",
-    "EventType",
+    "FREEZE_VERSION",
     "LEDGER_VERSION",
-    "LedgerEntry",
+    "REPORT_VERSION",
     "SESSION_NONCE_BYTES",
     "SNAPSHOT_VERSION",
-    "Snapshot",
     "WITNESS_ATTESTATION_VERSION",
+    "EventType",
+    "Freeze",
+    "LedgerEntry",
+    "ReasonCategory",
+    "Report",
+    "Snapshot",
     "WitnessAttestation",
 ]
