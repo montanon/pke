@@ -3,7 +3,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: "\\.canonical-bytes$"
       - id: end-of-file-fixer
+        exclude: "\\.canonical-bytes$"
       - id: check-yaml
       - id: check-json
       - id: check-toml

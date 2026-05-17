@@ -35,7 +35,7 @@ class VerificationResults(ToJsonValueMixin):
 
 class AttestationSummary(ToJsonValueMixin):
     model_config = ConfigDict(extra="forbid")
-    witness_count: int = Field(ge=0)
+    witness_count: int | None = Field(default=None, ge=0)
     transport: str | None = None
     attestation_strength: AttestationStrength | None = None
 
