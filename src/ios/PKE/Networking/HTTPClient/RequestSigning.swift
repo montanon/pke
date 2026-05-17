@@ -118,4 +118,3 @@ extension KeyGrant: SignablePayload {
     public static var signatureFieldKey: String { "grant_signature" }
 }
 #endif
-
