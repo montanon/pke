@@ -1,0 +1,37 @@
+// Unified crypto error taxonomy mirroring the Python backend's
+// `pke_backend.crypto.errors` types. The `reason` payload must NEVER contain
+// key bytes, plaintext, or signature material — only offsets, lengths, and
+// non-sensitive labels suitable for logs and verifier reports.
+
+import Foundation
+
+public enum CryptoError: Error, Equatable, Sendable {
+    case canonicalEncoding(reason: String)
+    case encoding(reason: String)
+    case signatureFormat(reason: String)
+    case signatureVerification(reason: String)
+    case hashChain(reason: String)
+    case aead(reason: String)
+    case wrap(reason: String)
+}
+
+extension CryptoError: CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .canonicalEncoding(let reason):
+            return "canonicalEncoding: \(reason)"
+        case .encoding(let reason):
+            return "encoding: \(reason)"
+        case .signatureFormat(let reason):
+            return "signatureFormat: \(reason)"
+        case .signatureVerification(let reason):
+            return "signatureVerification: \(reason)"
+        case .hashChain(let reason):
+            return "hashChain: \(reason)"
+        case .aead(let reason):
+            return "aead: \(reason)"
+        case .wrap(let reason):
+            return "wrap: \(reason)"
+        }
+    }
+}
