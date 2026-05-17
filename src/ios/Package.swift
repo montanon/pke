@@ -59,6 +59,7 @@ let package = Package(
         .library(name: "PKEWitness", targets: ["PKEWitness"]),
         .library(name: "PKEHTTPClient", targets: ["PKEHTTPClient"]),
         .library(name: "PKESession", targets: ["PKESession"]),
+        .library(name: "PKERecipient", targets: ["PKERecipient"]),
         .library(name: "PKEApp", targets: ["PKEApp"])
     ],
     dependencies: [
@@ -103,6 +104,22 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto")
             ],
             path: "PKE/Services/Session"
+        ),
+        // PKERecipient — recipient-flow decryption service (HLAM-118).
+        //
+        // Cross-platform module. Composes `KeyWrap.unwrap` + `AEAD.open`
+        // behind a typed `DecryptionError` surface. The unwrap step is
+        // injected via a closure so Apple platforms can wire
+        // `DeviceIdentitySession.unwrap` (Security-framework gated) and
+        // Linux CI can wire `KeyWrap.unwrap` directly.
+        .target(
+            name: "PKERecipient",
+            dependencies: [
+                "PKECrypto",
+                "PKEProtocol",
+                .product(name: "Crypto", package: "swift-crypto")
+            ],
+            path: "PKE/Services/Recipient"
         ),
         // PKEApp — SwiftUI navigation skeleton (HLAM-92) + Settings/Limitations
         // screens (HLAM-95).
@@ -178,6 +195,26 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto")
             ],
             path: "PKETests/Session"
+        ),
+        // PKERecipientTests reuses the shared crypto vector corpus via a
+        // symlink under Resources/test_vectors — same pattern as
+        // PKECryptoTests. The `.process` resource declaration enforces
+        // basename uniqueness so the test_vectors/README.md is excluded.
+        .testTarget(
+            name: "PKERecipientTests",
+            dependencies: [
+                "PKERecipient",
+                "PKECrypto",
+                "PKEProtocol",
+                .product(name: "Crypto", package: "swift-crypto")
+            ],
+            path: "PKETests/Recipient",
+            exclude: [
+                "Resources/test_vectors/README.md"
+            ],
+            resources: [
+                .process("Resources/test_vectors")
+            ]
         ),
         .testTarget(
             name: "PKEAppTests",
