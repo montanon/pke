@@ -121,23 +121,24 @@ final class SignaturesTests: XCTestCase {
     // MARK: - AC #9 — parametric vector runner against shared fixtures
 
     func test_ecdsa_p256_vectors_from_bundle() throws {
-        // Hex-only convention assumed (per src/shared/test_vectors/README.md):
-        //   inputs.public_key_x962_uncompressed (65 bytes, starts 0x04)
-        //   inputs.message                      (arbitrary bytes)
-        //   inputs.signature_p1363              (64 bytes, positive cases)
-        //   expected.error                      ("signatureFormat" | "signatureVerification")
-        let urls = loadEcdsaVectorURLs()
-        if urls.isEmpty {
+        // Schema (see src/shared/test_vectors/ecdsa_p256/*.json):
+        //   inputs.public_key_uncompressed_hex (65-byte 0x04‖X‖Y, hex)
+        //   inputs.message_hex                 (arbitrary bytes, hex)
+        //   expected.signature_p1363_hex       (64 bytes, hex)
+        //
+        // Positive vectors verify successfully; negatives mutate the
+        // expected signature and must fail verification with
+        // `CryptoError.signatureVerification`.
+        let vectors = loadEcdsaVectors()
+        if vectors.isEmpty {
             throw XCTSkip("no ecdsa_p256 fixtures present")
         }
 
-        for url in urls.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-            let data = try Data(contentsOf: url)
-            let bundleCase = try JSONDecoder().decode(EcdsaVector.self, from: data)
-            let pubBytes = try Self.hexToData(bundleCase.inputs.publicKeyX962Uncompressed)
+        for (_, bundleCase) in vectors {
+            let pubBytes = try Self.hexToData(bundleCase.inputs.publicKeyUncompressedHex)
             let pub = try P256.Signing.PublicKey(x963Representation: pubBytes)
-            let message = try Self.hexToData(bundleCase.inputs.message)
-            let signature = try Self.hexToData(bundleCase.inputs.signatureP1363)
+            let message = try Self.hexToData(bundleCase.inputs.messageHex)
+            let signature = try Self.hexToData(bundleCase.expected.signatureP1363Hex)
 
             if bundleCase.valid {
                 XCTAssertNoThrow(
@@ -145,12 +146,13 @@ final class SignaturesTests: XCTestCase {
                     "vector \(bundleCase.name) expected to verify"
                 )
             } else {
-                let expected = bundleCase.expected.error ?? ""
                 XCTAssertThrowsError(
                     try Signatures.verify(signature, of: message, by: pub),
-                    "vector \(bundleCase.name) expected to reject with \(expected)"
+                    "vector \(bundleCase.name) expected to reject"
                 ) { error in
-                    self.assertMatches(expected: expected, error: error, name: bundleCase.name)
+                    self.assertMatches(expected: bundleCase.expected.error,
+                                       error: error,
+                                       name: bundleCase.name)
                 }
             }
         }
@@ -158,7 +160,7 @@ final class SignaturesTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func loadEcdsaVectorURLs() -> [URL] {
+    private func loadEcdsaVectors() -> [(URL, EcdsaVector)] {
         var urls: [URL] = []
         if let dir = Bundle.module.url(forResource: "test_vectors/ecdsa_p256", withExtension: nil),
            let contents = try? FileManager.default.contentsOfDirectory(
@@ -167,30 +169,43 @@ final class SignaturesTests: XCTestCase {
            ) {
             urls.append(contentsOf: contents.filter { $0.pathExtension == "json" })
         }
-        if urls.isEmpty,
-           let flattened = Bundle.module.urls(
-            forResourcesWithExtension: "json",
-            subdirectory: "test_vectors/ecdsa_p256"
-           ) {
-            urls.append(contentsOf: flattened)
+        if urls.isEmpty {
+            urls.append(contentsOf: BundleResourceURLs.jsonResources(
+                in: .module,
+                subdirectory: "test_vectors/ecdsa_p256"
+            ))
         }
-        return urls
+        // SwiftPM's `.process` flattens the resource tree; fall back to a
+        // flat search and let schema-decoding gate inclusion to
+        // ecdsa_p256-shaped fixtures only.
+        if urls.isEmpty {
+            urls.append(contentsOf: BundleResourceURLs.jsonResources(
+                in: .module,
+                subdirectory: nil
+            ))
+        }
+        let decoder = JSONDecoder()
+        var matched: [(URL, EcdsaVector)] = []
+        for url in urls.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            guard let data = try? Data(contentsOf: url),
+                  let vector = try? decoder.decode(EcdsaVector.self, from: data) else {
+                continue
+            }
+            matched.append((url, vector))
+        }
+        return matched
     }
 
-    private func assertMatches(expected: String, error: Error, name: String) {
+    private func assertMatches(expected: String?, error: Error, name: String) {
         switch error as? CryptoError {
         case .signatureFormat(let reason):
-            XCTAssertEqual(
-                expected,
-                "signatureFormat",
-                "vector \(name): got signatureFormat (\(reason)), expected \(expected)"
-            )
+            if let expected, expected != "signatureFormat" {
+                XCTFail("vector \(name): got signatureFormat (\(reason)), expected \(expected)")
+            }
         case .signatureVerification:
-            XCTAssertEqual(
-                expected,
-                "signatureVerification",
-                "vector \(name): got signatureVerification, expected \(expected)"
-            )
+            if let expected, expected != "signatureVerification" {
+                XCTFail("vector \(name): got signatureVerification, expected \(expected)")
+            }
         default:
             XCTFail("vector \(name): unexpected error \(error)")
         }
@@ -229,18 +244,24 @@ private struct EcdsaVector: Decodable {
     let notes: String?
 
     struct Inputs: Decodable {
-        let publicKeyX962Uncompressed: String
-        let message: String
-        let signatureP1363: String
+        let publicKeyUncompressedHex: String
+        let messageHex: String
 
         enum CodingKeys: String, CodingKey {
-            case publicKeyX962Uncompressed = "public_key_x962_uncompressed"
-            case message
-            case signatureP1363 = "signature_p1363"
+            case publicKeyUncompressedHex = "public_key_uncompressed_hex"
+            case messageHex = "message_hex"
         }
     }
 
     struct Expected: Decodable {
+        let signatureP1363Hex: String
+        // Optional in the fixture format: positive vectors omit it,
+        // negative vectors may carry a discriminator like "signatureVerification".
         let error: String?
+
+        enum CodingKeys: String, CodingKey {
+            case signatureP1363Hex = "signature_p1363_hex"
+            case error
+        }
     }
 }
