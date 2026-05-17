@@ -238,7 +238,7 @@ final class RequestSigningTests: XCTestCase {
         guard case let .string(signatureString)? = signatureEntry?.1 else {
             throw TestFailure.missingSignature
         }
-        let signature = try Base64URL.decode(signatureString)
+        let signature = try PKECrypto.Base64URL.decode(signatureString)
         let strippedPairs = pairs.filter { $0.0 != signatureKey }
         let stripped = try CanonicalJSON.encode(.object(strippedPairs))
         return (signature, stripped)

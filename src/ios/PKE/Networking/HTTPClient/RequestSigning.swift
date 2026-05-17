@@ -88,7 +88,7 @@ public enum RequestSigning {
             payload: bytesToSign,
             with: identity.signingKey
         )
-        let signatureString = Base64URL.encode(signatureBytes)
+        let signatureString = PKECrypto.Base64URL.encode(signatureBytes)
 
         var signedPairs = strippedPairs
         signedPairs.append((signatureKey, .string(signatureString)))
