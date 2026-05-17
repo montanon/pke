@@ -79,7 +79,7 @@ let package = Package(
         ),
         .target(
             name: "PKEHTTPClient",
-            dependencies: ["PKEIdentity", "PKECrypto"],
+            dependencies: ["PKEIdentity", "PKECrypto", "PKEProtocol"],
             path: "PKE/Networking/HTTPClient"
         ),
         .testTarget(
@@ -120,6 +120,8 @@ let package = Package(
             dependencies: [
                 "PKEHTTPClient",
                 "PKEIdentity",
+                "PKECrypto",
+                "PKEProtocol",
                 .product(name: "Crypto", package: "swift-crypto")
             ],
             path: "PKETests/HTTPClient"
