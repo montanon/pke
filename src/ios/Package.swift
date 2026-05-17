@@ -47,7 +47,8 @@ let package = Package(
         .library(name: "PKEProtocol", targets: ["PKEProtocol"]),
         .library(name: "PKEIdentity", targets: ["PKEIdentity"]),
         .library(name: "PKEWitness", targets: ["PKEWitness"]),
-        .library(name: "PKEHTTPClient", targets: ["PKEHTTPClient"])
+        .library(name: "PKEHTTPClient", targets: ["PKEHTTPClient"]),
+        .library(name: "PKEApp", targets: ["PKEApp"])
     ],
     dependencies: [
         .package(
@@ -81,6 +82,21 @@ let package = Package(
             name: "PKEHTTPClient",
             dependencies: ["PKEIdentity", "PKECrypto"],
             path: "PKE/Networking/HTTPClient"
+        ),
+        // PKEApp — SwiftUI navigation skeleton (HLAM-92).
+        //
+        // Hosts the AppRoute enum, AppNavigationState ObservableObject,
+        // role-selection view, and placeholder role screens. Sources span
+        // two sibling directories under PKE/ — `App/` for state &
+        // routing, `Views/` for SwiftUI views — declared via the
+        // `sources:` array so the target picks up both without
+        // overlapping the sibling library targets above. The `@main App`
+        // type in PKEApp.swift is gated `#if canImport(UIKit)` so the
+        // library still compiles on Linux CI as an empty TU.
+        .target(
+            name: "PKEApp",
+            path: "PKE",
+            sources: ["App", "Views"]
         ),
         .testTarget(
             name: "PKECryptoTests",
@@ -123,6 +139,11 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto")
             ],
             path: "PKETests/HTTPClient"
+        ),
+        .testTarget(
+            name: "PKEAppTests",
+            dependencies: ["PKEApp"],
+            path: "PKETests/App"
         )
     ]
 )
