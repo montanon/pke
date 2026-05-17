@@ -15,12 +15,14 @@ from pke_backend.models.freeze import FREEZE_VERSION, Freeze
 from pke_backend.models.key_grant import KEY_GRANT_VERSION, KeyGrant
 from pke_backend.models.ledger import LEDGER_VERSION, EventType, LedgerEntry
 from pke_backend.models.report import REPORT_VERSION, ReasonCategory, Report
+from pke_backend.models.session import Session
 from pke_backend.models.snapshot import (
     CIPHERTEXT_HASH_BYTES,
     SESSION_NONCE_BYTES,
     SNAPSHOT_VERSION,
     Snapshot,
 )
+from pke_backend.models.user import User
 
 __all__ = [
     "CIPHERTEXT_HASH_BYTES",
@@ -37,6 +39,8 @@ __all__ = [
     "LedgerEntry",
     "ReasonCategory",
     "Report",
+    "Session",
     "Snapshot",
+    "User",
     "WitnessAttestation",
 ]
