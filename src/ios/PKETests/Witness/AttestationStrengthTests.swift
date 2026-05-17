@@ -8,10 +8,10 @@ import XCTest
 
 final class AttestationStrengthTests: XCTestCase {
 
-    // MARK: AC #1 — zero witnesses → .none
+    // MARK: AC #1 — zero witnesses → AttestationStrength.none
 
     func test_bucket_forZero_isNone() {
-        XCTAssertEqual(AttestationStrength.bucket(for: 0), .none)
+        XCTAssertEqual(AttestationStrength.bucket(for: 0), AttestationStrength.none)
     }
 
     // MARK: AC #2 — 1 and 2 → .low
@@ -35,11 +35,11 @@ final class AttestationStrengthTests: XCTestCase {
         XCTAssertEqual(AttestationStrength.bucket(for: 100), .high)
     }
 
-    // MARK: AC #5 — negative input → .none (defensive)
+    // MARK: AC #5 — negative input → AttestationStrength.none (defensive)
 
     func test_bucket_forNegativeInput_isNoneDefensively() {
-        XCTAssertEqual(AttestationStrength.bucket(for: -1), .none)
-        XCTAssertEqual(AttestationStrength.bucket(for: Int.min), .none)
+        XCTAssertEqual(AttestationStrength.bucket(for: -1), AttestationStrength.none)
+        XCTAssertEqual(AttestationStrength.bucket(for: Int.min), AttestationStrength.none)
     }
 
     // MARK: AC #6 — exactly the four documented cases
@@ -47,7 +47,7 @@ final class AttestationStrengthTests: XCTestCase {
     func test_cases_areExactlyFourDocumentedValues() {
         XCTAssertEqual(
             Set(AttestationStrength.allCases),
-            Set([.none, .low, .medium, .high])
+            Set([AttestationStrength.none, .low, .medium, .high])
         )
         XCTAssertEqual(AttestationStrength.allCases.count, 4)
     }

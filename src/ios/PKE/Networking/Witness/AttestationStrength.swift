@@ -16,14 +16,14 @@
 
 import Foundation
 
-public enum AttestationStrength: String, CaseIterable, Sendable {
+public enum AttestationStrength: CaseIterable, Sendable {
     case none
     case low
     case medium
     case high
 
     /// Map a raw witness count to its strength bucket. O(1), pure.
-    public static func bucket(for count: Int) -> AttestationStrength {
+    public static func bucket(for count: Int) -> Self {
         switch count {
         case ..<1:
             return .none
