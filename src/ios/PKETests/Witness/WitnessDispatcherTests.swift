@@ -278,9 +278,12 @@ final class WitnessDispatcherTests: XCTestCase {
         consumer.cancel()
         await consumer.value
 
-        // The onTermination handler schedules a stop; give it a beat to run.
-        for _ in 0..<50 where transport.stops == 0 {
-            try? await Task.sleep(nanoseconds: 10_000_000)
+        // The onTermination handler hops through two Tasks before reaching
+        // transport.stop(). Poll with a generous budget — slower CI runners
+        // (especially Linux) take noticeably longer than macOS to drain the
+        // chain of detached Tasks involved.
+        for _ in 0..<200 where transport.stops == 0 {
+            try? await Task.sleep(nanoseconds: 25_000_000)
         }
         XCTAssertEqual(transport.stops, 1)
     }

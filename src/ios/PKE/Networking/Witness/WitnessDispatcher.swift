@@ -117,8 +117,8 @@ private actor DispatchSession {
             let task = Task { [weak self] in
                 let stream = transport.runCapturer(session: session)
                 for await attestation in stream {
-                    let accepted = (await self?.ingest(attestation)) ?? false
-                    if !accepted { break }
+                    let result: Bool? = await self?.ingest(attestation)
+                    if result != true { break }
                 }
                 await self?.producerFinished()
             }
