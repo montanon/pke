@@ -108,10 +108,9 @@ final class SnapshotEndpointsTests: XCTestCase {
         let commitment = makeUnsignedCommitment(identity: identity)
 
         MockURLProtocol.handler = { _ in
-            // swiftlint:disable:next force_unwrapping
-            let body = """
+            let body = Data("""
             {"error":{"code":"duplicate","detail":"snap-abc already committed"}}
-            """.data(using: .utf8)!
+            """.utf8)
             let response = HTTPURLResponse(
                 url: baseURL.appendingPathComponent("v1/snapshots"),
                 statusCode: 409,
@@ -178,10 +177,9 @@ final class SnapshotEndpointsTests: XCTestCase {
         MockURLProtocol.handler = { request in
             // swiftlint:disable:next force_unwrapping
             let url = request.url!
-            // swiftlint:disable:next force_unwrapping
-            let body = """
+            let body = Data("""
             {"error":{"code":"hash_mismatch","detail":"sha256 disagreement"}}
-            """.data(using: .utf8)!
+            """.utf8)
             let response = HTTPURLResponse(
                 url: url,
                 statusCode: 422,
@@ -240,46 +238,17 @@ final class SnapshotEndpointsTests: XCTestCase {
     func testFetchSnapshotBundleRejectsTamperedAttestation() async throws {
         let baseURL = makeBaseURL()
         let owner = makeIdentity()
-        let witness = makeIdentity()
-        let granter = makeIdentity()
-
         let commitment = try makeSignedCommitment(identity: owner)
-        let attestation = try makeSignedAttestation(identity: witness)
-        let keyGrant = try makeSignedKeyGrant(identity: granter)
-
-        // Tamper one byte of the attestation's snapshot_id; the signature
-        // no longer covers the current canonical bytes.
-        let tampered = WitnessAttestation(
-            version: attestation.version,
-            snapshotId: attestation.snapshotId + "X",
-            ciphertextHash: attestation.ciphertextHash,
-            sessionNonce: attestation.sessionNonce,
-            ownerSigningPublicKey: attestation.ownerSigningPublicKey,
-            witnessSigningPublicKey: attestation.witnessSigningPublicKey,
-            witnessTimestamp: attestation.witnessTimestamp,
-            transport: attestation.transport,
-            proximityClaim: attestation.proximityClaim,
-            witnessSignature: attestation.witnessSignature
-        )
+        let attestation = try makeSignedAttestation(identity: makeIdentity())
+        let keyGrant = try makeSignedKeyGrant(identity: makeIdentity())
         let bundle = SnapshotBundle(
             commitment: commitment,
-            attestations: [tampered],
+            attestations: [Self.tamperedSnapshotId(of: attestation)],
             keyGrants: [keyGrant]
         )
         let bundleBytes = try encodeJSON(bundle)
 
-        MockURLProtocol.handler = { request in
-            // swiftlint:disable:next force_unwrapping
-            let url = request.url!
-            let response = HTTPURLResponse(
-                url: url,
-                statusCode: 200,
-                httpVersion: "HTTP/1.1",
-                headerFields: nil
-            )
-            // swiftlint:disable:next force_unwrapping
-            return (response!, bundleBytes)
-        }
+        MockURLProtocol.handler = Self.bundle200Handler(bundleBytes)
 
         let client = makeMockClient(baseURL: baseURL, identity: owner)
         do {
@@ -329,24 +298,63 @@ final class SnapshotEndpointsTests: XCTestCase {
         // tractable here; this test confirms byte-level round-trip.
     }
 
-    // MARK: - Helpers
+}
 
-    private func makeBaseURL() -> URL {
+// MARK: - Helpers (file-scope to keep the test class body under SwiftLint's
+// `type_body_length` ceiling). All members stay `fileprivate` so they remain
+// scoped to this test file and never leak into the rest of the module.
+
+fileprivate extension SnapshotEndpointsTests {
+
+    /// Returns a `WitnessAttestation` whose `snapshotId` has had one
+    /// character appended — the inline signature no longer covers the
+    /// current canonical bytes, so re-verification must fail.
+    static func tamperedSnapshotId(of attestation: WitnessAttestation) -> WitnessAttestation {
+        WitnessAttestation(
+            version: attestation.version,
+            snapshotId: attestation.snapshotId + "X",
+            ciphertextHash: attestation.ciphertextHash,
+            sessionNonce: attestation.sessionNonce,
+            ownerSigningPublicKey: attestation.ownerSigningPublicKey,
+            witnessSigningPublicKey: attestation.witnessSigningPublicKey,
+            witnessTimestamp: attestation.witnessTimestamp,
+            transport: attestation.transport,
+            proximityClaim: attestation.proximityClaim,
+            witnessSignature: attestation.witnessSignature
+        )
+    }
+
+    /// Stock `200 OK` handler that returns the supplied bundle bytes for
+    /// whichever URL is being fetched. Extracted to keep test bodies under
+    /// SwiftLint's `function_body_length` ceiling.
+    static func bundle200Handler(_ bytes: Data) -> (URLRequest) -> (HTTPURLResponse, Data) {
+        { request in
+            // swiftlint:disable:next force_unwrapping
+            let url = request.url!
+            // swiftlint:disable:next force_unwrapping
+            let response = HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: nil
+            )!
+            return (response, bytes)
+        }
+    }
+
+    func makeBaseURL() -> URL {
         // swiftlint:disable:next force_unwrapping
         URL(string: "https://pke.test.invalid")!
     }
 
-    private func makeIdentity() -> DeviceIdentity {
+    func makeIdentity() -> DeviceIdentity {
         DeviceIdentity(
             signingKey: P256.Signing.PrivateKey(),
             agreementKey: P256.KeyAgreement.PrivateKey()
         )
     }
 
-    private func makeMockClient(
-        baseURL: URL,
-        identity: DeviceIdentity
-    ) -> PKEHTTPClient {
+    func makeMockClient(baseURL: URL, identity: DeviceIdentity) -> PKEHTTPClient {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
         return PKEHTTPClient(
@@ -356,14 +364,11 @@ final class SnapshotEndpointsTests: XCTestCase {
         )
     }
 
-    private func encodeJSON<T: Encodable>(_ value: T) throws -> Data {
-        let encoder = JSONEncoder()
-        return try encoder.encode(value)
+    func encodeJSON<T: Encodable>(_ value: T) throws -> Data {
+        try JSONEncoder().encode(value)
     }
 
-    private func makeUnsignedCommitment(
-        identity: DeviceIdentity
-    ) -> SnapshotCommitment {
+    func makeUnsignedCommitment(identity: DeviceIdentity) -> SnapshotCommitment {
         SnapshotCommitment(
             version: "0.1",
             snapshotId: "snap-abc",
@@ -381,17 +386,13 @@ final class SnapshotEndpointsTests: XCTestCase {
         )
     }
 
-    private func makeSignedCommitment(
-        identity: DeviceIdentity
-    ) throws -> SnapshotCommitment {
+    func makeSignedCommitment(identity: DeviceIdentity) throws -> SnapshotCommitment {
         let unsigned = makeUnsignedCommitment(identity: identity)
         let bytes = try RequestSigning.sign(unsigned, with: identity)
         return try JSONDecoder().decode(SnapshotCommitment.self, from: bytes)
     }
 
-    private func makeSignedAttestation(
-        identity: DeviceIdentity
-    ) throws -> WitnessAttestation {
+    func makeSignedAttestation(identity: DeviceIdentity) throws -> WitnessAttestation {
         let unsigned = WitnessAttestation(
             version: "0.1",
             snapshotId: "snap-001",
@@ -411,9 +412,7 @@ final class SnapshotEndpointsTests: XCTestCase {
         return try JSONDecoder().decode(WitnessAttestation.self, from: bytes)
     }
 
-    private func makeSignedKeyGrant(
-        identity: DeviceIdentity
-    ) throws -> KeyGrant {
+    func makeSignedKeyGrant(identity: DeviceIdentity) throws -> KeyGrant {
         let unsigned = KeyGrant(
             version: "0.1",
             grantId: "grant-001",
