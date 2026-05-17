@@ -154,7 +154,7 @@ private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        guard let handler = MockURLProtocol.handler else {
+        guard let handler = Self.handler else {
             client?.urlProtocol(self, didFailWithError: URLError(.cannotLoadFromNetwork))
             return
         }
