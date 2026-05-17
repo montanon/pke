@@ -7,6 +7,11 @@ and must not be confused with the API contract models that live here.
 
 from __future__ import annotations
 
+from pke_backend.schemas.attestation import (
+    ProximityClaim,
+    WitnessAttestationIn,
+    WitnessAttestationOut,
+)
 from pke_backend.schemas.snapshot import (
     OWNER_SIGNING_PUBLIC_KEY_BYTES,
     SnapshotCommitmentIn,
@@ -15,6 +20,9 @@ from pke_backend.schemas.snapshot import (
 
 __all__ = [
     "OWNER_SIGNING_PUBLIC_KEY_BYTES",
+    "ProximityClaim",
     "SnapshotCommitmentIn",
     "SnapshotOut",
+    "WitnessAttestationIn",
+    "WitnessAttestationOut",
 ]
