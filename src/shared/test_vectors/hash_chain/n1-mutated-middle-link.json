@@ -1,0 +1,44 @@
+{
+  "name": "n1-mutated-middle-link",
+  "inputs": {
+    "chain": [
+      {
+        "seq": 0,
+        "payload_hash_hex": "fb17bbe2a8cbda1d0b262ecd34da07065a4830d9224b81680ab8aa600d7731e9",
+        "previous_entry_hash_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "seq": 1,
+        "payload_hash_hex": "98f5d5c5d4dd7dda926792db370710d2bc1f7c70d3399d802817444ea3d92dfa",
+        "previous_entry_hash_hex": "05d4681082b8365de6fa472f970dd7548650c1d0c398e3c0cba8ecaf52546832"
+      },
+      {
+        "seq": 2,
+        "payload_hash_hex": "2fcc80db2509fb9c32e7ec3f3ef93e3ccdb4641d3811467ed60add5766fa6402",
+        "previous_entry_hash_hex": "7122d574b11af9b7e3f8c7621c47399530ca862fa586d18d133a5ddee31bda69"
+      },
+      {
+        "seq": 3,
+        "payload_hash_hex": "0855b620462270ea348141026a0c2f58efb5d91fb229765ebdc0ab1e4c2bb605",
+        "previous_entry_hash_hex": "24a0fcfd84cb91f9f02940b68b7286de4f47b83b2c8cff1d17840cc2d1bb27a0"
+      },
+      {
+        "seq": 4,
+        "payload_hash_hex": "ef2acd9aa3f0c771dbaf5fa41bdfa6ea284abc3e879c73d81bb49b8a318a5b13",
+        "previous_entry_hash_hex": "915f612b996a243d4df17c7d04ea6654e177d49a80c8d2451be3bc970e8d7112"
+      }
+    ]
+  },
+  "expected": {
+    "entry_hashes_hex": [
+      "05d4681082b8365de6fa472f970dd7548650c1d0c398e3c0cba8ecaf52546832",
+      "7122d574b11af9b7e3f8c7621c47399530ca862fa586d18d133a5ddee31bda69",
+      "24a0fcfd84cb91f9f02940b68b7286de4f47b83b2c8cff1d17840cc2d1bb27a0",
+      "915f612b996a243d4df17c7d04ea6654e177d49a80c8d2451be3bc970e8d7112",
+      "b9307439628070b038ca1cc6501e54c5493e7ca934beaf795792173837b2da17"
+    ],
+    "broken_at_index": 2
+  },
+  "valid": false,
+  "notes": "Sibling positive: p3-len5. inputs.chain[2].payload_hash_hex byte at offset 11 flipped (XOR 0x01). expected.entry_hashes_hex retains the original chain's hashes; an implementation recomputing entry_hash over the mutated chain will diverge starting at index 2 (broken_at_index)."
+}

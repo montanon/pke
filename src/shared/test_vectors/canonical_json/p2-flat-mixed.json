@@ -1,0 +1,15 @@
+{
+  "name": "p2-flat-mixed",
+  "inputs": {
+    "value": {
+      "b": 2,
+      "a": "x",
+      "c": true
+    }
+  },
+  "expected": {
+    "canonical_bytes_hex": "7b2261223a2278222c2262223a322c2263223a747275657d"
+  },
+  "valid": true,
+  "notes": "Keys must sort lexicographically: a, b, c."
+}

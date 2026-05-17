@@ -1,0 +1,15 @@
+{
+  "name": "p4-unicode",
+  "inputs": {
+    "value": {
+      "name": "café",
+      "city": "São Paulo",
+      "symbol": "→"
+    }
+  },
+  "expected": {
+    "canonical_bytes_hex": "7b2263697479223a2253c3a36f205061756c6f222c226e616d65223a22636166c3a9222c2273796d626f6c223a22e28692227d"
+  },
+  "valid": true,
+  "notes": "ensure_ascii=False — non-ASCII characters are emitted as raw UTF-8 bytes."
+}

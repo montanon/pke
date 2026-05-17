@@ -1,0 +1,25 @@
+{
+  "name": "p2-len2",
+  "inputs": {
+    "chain": [
+      {
+        "seq": 0,
+        "payload_hash_hex": "3836d2ab015fb2de3588e46a26d792e2c504778b314a0fca848aeb34633000ff",
+        "previous_entry_hash_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "seq": 1,
+        "payload_hash_hex": "d168bf4e48ab40119218e051a758060620f7eac8b2d0d663447bf866cb7df703",
+        "previous_entry_hash_hex": "4a39fb009b5db65cfd09b3ff4cc64125b775d4a33d000c68a10e474f4bb3a32b"
+      }
+    ]
+  },
+  "expected": {
+    "entry_hashes_hex": [
+      "4a39fb009b5db65cfd09b3ff4cc64125b775d4a33d000c68a10e474f4bb3a32b",
+      "53fa663bf08bbf27244426dbae07a7ee00102afa301ec68aa8143a4661c961e4"
+    ]
+  },
+  "valid": true,
+  "notes": "entry_hash[i] = SHA256(canonical_json(entry_i)); entry_i includes previous_entry_hash_hex which is entry_hash[i-1] (or 32 zero bytes for genesis)."
+}
