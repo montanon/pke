@@ -9,10 +9,12 @@ public enum CryptoError: Error, Equatable, Sendable {
     case canonicalEncoding(reason: String)
     case encoding(reason: String)
     case signatureFormat(reason: String)
-    case signatureVerification(reason: String)
+    case signatureVerification
     case hashChain(reason: String)
     case aead(reason: String)
     case wrap(reason: String)
+    case keychain(reason: String)
+    case identity(reason: String)
 }
 
 extension CryptoError: CustomStringConvertible {
@@ -24,14 +26,18 @@ extension CryptoError: CustomStringConvertible {
             return "encoding: \(reason)"
         case .signatureFormat(let reason):
             return "signatureFormat: \(reason)"
-        case .signatureVerification(let reason):
-            return "signatureVerification: \(reason)"
+        case .signatureVerification:
+            return "signatureVerification"
         case .hashChain(let reason):
             return "hashChain: \(reason)"
         case .aead(let reason):
             return "aead: \(reason)"
         case .wrap(let reason):
             return "wrap: \(reason)"
+        case .keychain(let reason):
+            return "keychain: \(reason)"
+        case .identity(let reason):
+            return "identity: \(reason)"
         }
     }
 }

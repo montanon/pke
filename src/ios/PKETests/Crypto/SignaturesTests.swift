@@ -43,11 +43,10 @@ final class SignaturesTests: XCTestCase {
         XCTAssertThrowsError(
             try Signatures.verify(signature, of: payload, by: key2.publicKey)
         ) { error in
-            guard case .signatureVerification(let reason) = error as? CryptoError else {
+            guard case .signatureVerification = error as? CryptoError else {
                 XCTFail("expected signatureVerification, got \(error)")
                 return
             }
-            XCTAssertFalse(reason.isEmpty)
         }
     }
 
@@ -186,11 +185,11 @@ final class SignaturesTests: XCTestCase {
                 "signatureFormat",
                 "vector \(name): got signatureFormat (\(reason)), expected \(expected)"
             )
-        case .signatureVerification(let reason):
+        case .signatureVerification:
             XCTAssertEqual(
                 expected,
                 "signatureVerification",
-                "vector \(name): got signatureVerification (\(reason)), expected \(expected)"
+                "vector \(name): got signatureVerification, expected \(expected)"
             )
         default:
             XCTFail("vector \(name): unexpected error \(error)")
