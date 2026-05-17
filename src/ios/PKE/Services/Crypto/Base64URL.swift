@@ -46,12 +46,10 @@ public enum Base64URL {
     }
 
     private static func validateURLSafe(_ string: String) throws {
-        for (offset, scalar) in string.unicodeScalars.enumerated() {
-            if !isURLSafeAlphabet(scalar) {
-                throw CryptoError.encoding(
-                    reason: "invalid character at index \(offset)"
-                )
-            }
+        for (offset, scalar) in string.unicodeScalars.enumerated() where !isURLSafeAlphabet(scalar) {
+            throw CryptoError.encoding(
+                reason: "invalid character at index \(offset)"
+            )
         }
     }
 

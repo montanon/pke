@@ -5,6 +5,6 @@ public enum JSONValue: Equatable {
     case integer(Int64)
     case bool(Bool)
     case null
-    case array([JSONValue])
-    case object([String: JSONValue])
+    case array([Self])
+    case object([String: Self])
 }
