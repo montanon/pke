@@ -15,10 +15,12 @@ from pke_backend.services.blob_storage import (
 )
 from pke_backend.services.ledger import (
     LEDGER_LOCK_KEY,
+    ChainVerification,
     LedgerCanonicalizationError,
     LedgerError,
     append_entry,
     get_head,
+    verify_chain,
 )
 
 __all__ = [
@@ -31,9 +33,11 @@ __all__ = [
     "BlobStore",
     "BlobStoreError",
     "BlobStoreIOError",
+    "ChainVerification",
     "FilesystemBlobStore",
     "LedgerCanonicalizationError",
     "LedgerError",
     "append_entry",
     "get_head",
+    "verify_chain",
 ]

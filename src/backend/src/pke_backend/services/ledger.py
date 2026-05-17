@@ -64,10 +64,11 @@ module fails to import.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pke_backend.crypto.canonicalize import canonicalize
@@ -80,10 +81,12 @@ from pke_backend.protocol.ledger import LedgerEventType
 
 __all__ = [
     "LEDGER_LOCK_KEY",
+    "ChainVerification",
     "LedgerCanonicalizationError",
     "LedgerError",
     "append_entry",
     "get_head",
+    "verify_chain",
 ]
 
 LEDGER_LOCK_KEY: Final[int] = 0x504B454C45444752
@@ -97,7 +100,20 @@ the same bound.
 
 _GENESIS_PREVIOUS_ENTRY_HASH: Final[bytes] = b"\x00" * 32
 
+_ENTRY_HASH_BYTES: Final[int] = 32
+
 _LEDGER_ENTRY_ENVELOPE_TYPE: Final[str] = "ledger_entry"
+
+_VERIFY_BATCH_SIZE: Final[int] = 256
+"""Cursor batch size for :func:`verify_chain`.
+
+Chosen so each ``fetchmany`` round trip carries enough rows to amortise its
+cost without keeping more than ~256 ORM rows resident at once. The streaming
+test pins the contract by asserting the statement passed to
+:meth:`AsyncSession.stream` carries ``yield_per`` equal to this value — that
+is what proves the verifier is actually streaming rather than materialising
+the table in one fetch.
+"""
 
 
 class LedgerError(Exception):
@@ -115,6 +131,32 @@ class LedgerError(Exception):
 
 class LedgerCanonicalizationError(LedgerError):
     __slots__ = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ChainVerification:
+    """Result of :func:`verify_chain`.
+
+    ``verified`` is ``True`` iff every entry's recomputed ``entry_hash``
+    matches the stored value and every ``previous_entry_hash`` links to the
+    prior row (or is SQL NULL on the genesis row).
+
+    On failure, ``first_divergence_index`` is the 0-based position in the
+    ``ORDER BY id ASC`` walk where the first inconsistency was detected, and
+    ``first_divergence_reason`` is a short, content-free explanation. Both
+    fields are ``None`` on success.
+
+    ``total_entries`` is the row count observed by a separate ``SELECT
+    count(*)`` issued before the stream begins. Under concurrent inserts the
+    count may lag the latest committed row; the integrity verdict itself
+    remains correct because the stream walk and the count both run under
+    Postgres read-committed isolation within the same session.
+    """
+
+    total_entries: int
+    verified: bool
+    first_divergence_index: int | None
+    first_divergence_reason: str | None
 
 
 _UTC_OFFSET_SUFFIX_LEN: Final[int] = len("+00:00")
@@ -137,6 +179,55 @@ def _serialize_utc_z(value: datetime) -> str:
     if iso.endswith("+00:00"):
         return iso[:-_UTC_OFFSET_SUFFIX_LEN] + "Z"
     return iso
+
+
+def _build_envelope(
+    *,
+    version: str,
+    ledger_entry_id: uuid.UUID,
+    event_type: LedgerEventType,
+    snapshot_id: uuid.UUID,
+    payload_hash: bytes,
+    previous_entry_hash_bytes: bytes,
+    entry_timestamp: datetime,
+) -> dict[str, JsonValue]:
+    """Construct the canonical ledger-entry envelope shared by writer and verifier.
+
+    The caller passes ``previous_entry_hash_bytes`` already substituted for
+    genesis (32 zero bytes) when the row has a SQL ``NULL``; this helper
+    performs no NULL handling itself. Keeping the call sites identical between
+    :func:`append_entry` (writer) and :func:`_envelope_for_row` (verifier) is
+    what binds the chain rule by code rather than by convention.
+    """
+    return {
+        "type": _LEDGER_ENTRY_ENVELOPE_TYPE,
+        "version": version,
+        "ledger_entry_id": str(ledger_entry_id),
+        "event_type": event_type.value,
+        "snapshot_id": str(snapshot_id),
+        "payload_hash": b64url_encode(payload_hash),
+        "previous_entry_hash": b64url_encode(previous_entry_hash_bytes),
+        "entry_timestamp": _serialize_utc_z(entry_timestamp),
+    }
+
+
+def _envelope_for_row(row: LedgerEntry) -> dict[str, JsonValue]:
+    """Rebuild the canonical envelope for a persisted ``LedgerEntry`` row.
+
+    Mirrors :func:`append_entry`'s envelope construction byte-for-byte. The
+    only transformation is the genesis substitution: a SQL ``NULL`` in
+    ``previous_entry_hash`` becomes 32 zero bytes for canonicalisation.
+    """
+    previous_bytes = row.previous_entry_hash if row.previous_entry_hash is not None else _GENESIS_PREVIOUS_ENTRY_HASH
+    return _build_envelope(
+        version=row.version,
+        ledger_entry_id=row.ledger_entry_id,
+        event_type=row.event_type,
+        snapshot_id=row.snapshot_id,
+        payload_hash=row.payload_hash,
+        previous_entry_hash_bytes=previous_bytes,
+        entry_timestamp=row.entry_timestamp,
+    )
 
 
 async def _lookup_by_dedup_key(
@@ -226,16 +317,15 @@ async def append_entry(
         ledger_entry_id = uuid.uuid4()
         now_utc = datetime.now(UTC)
 
-        envelope: dict[str, JsonValue] = {
-            "type": _LEDGER_ENTRY_ENVELOPE_TYPE,
-            "version": version,
-            "ledger_entry_id": str(ledger_entry_id),
-            "event_type": event_type.value,
-            "snapshot_id": str(snapshot_id),
-            "payload_hash": b64url_encode(payload_hash),
-            "previous_entry_hash": b64url_encode(previous_entry_hash_for_envelope),
-            "entry_timestamp": _serialize_utc_z(now_utc),
-        }
+        envelope = _build_envelope(
+            version=version,
+            ledger_entry_id=ledger_entry_id,
+            event_type=event_type,
+            snapshot_id=snapshot_id,
+            payload_hash=payload_hash,
+            previous_entry_hash_bytes=previous_entry_hash_for_envelope,
+            entry_timestamp=now_utc,
+        )
         entry_hash = sha256(canonicalize(envelope))
 
         entry = LedgerEntry(
@@ -251,3 +341,140 @@ async def append_entry(
         session.add(entry)
         await session.flush()
         return entry
+
+
+async def verify_chain(
+    *,
+    session: AsyncSession,
+    snapshot_id: uuid.UUID | None = None,
+) -> ChainVerification:
+    """Replay the global ledger chain and report integrity.
+
+    Streams every row in ``ORDER BY id ASC`` using an async cursor with
+    ``yield_per=_VERIFY_BATCH_SIZE`` so memory stays bounded regardless of
+    table size. For each row:
+
+    1. Confirms the stored ``entry_hash`` is exactly :data:`_ENTRY_HASH_BYTES`
+       bytes (defensive — the column is ``LargeBinary(32)`` UNIQUE, so this
+       is virtually unreachable through ordinary writes).
+    2. Recomputes ``sha256(canonicalize(envelope))`` from the row's persisted
+       fields via :func:`_envelope_for_row` (byte-identical to the writer
+       path) and compares it to the stored ``entry_hash``.
+    3. Confirms ``previous_entry_hash`` linkage: SQL ``NULL`` at the genesis
+       index 0, otherwise equal to the prior row's stored ``entry_hash``.
+
+    The first divergence stops the walk and is returned via the
+    ``first_divergence_*`` fields of :class:`ChainVerification`. The function
+    never raises on chain integrity failures — that is the design distinction
+    from :func:`pke_backend.crypto.hashing.verify_hash_chain`, which raises.
+    F6's verification report needs the divergence index in its response, not
+    in an exception handler.
+
+    The ``snapshot_id`` parameter is **informational only** and never narrows
+    the integrity walk: the chain is globally linear, so a per-snapshot view
+    of an intact chain must always reflect the full chain's verdict. The
+    parameter is reserved for a future return-shape that includes a
+    per-snapshot summary projection (out of scope here; HLAM-42 will own
+    that projection in the endpoint layer).
+
+    Caller contract mirrors :func:`append_entry`: the session must not have
+    an active transaction. ``verify_chain`` issues its own reads under
+    Postgres default read-committed isolation.
+
+    Concurrent writers that commit during the walk may add rows past the
+    cursor; those are not seen by the current call. ``total_entries`` is
+    captured by a separate ``SELECT count(*)`` before the stream begins and
+    may therefore lag the latest committed insert under contention.
+    """
+    if session.in_transaction():
+        raise LedgerError(
+            reason="session must not have an active transaction; commit or rollback before calling verify_chain",
+        )
+
+    # Accepted but unused at runtime: reserved for a future return-shape that
+    # projects per-snapshot entries from the global walk (see docstring §6 and
+    # the Phase-1 design comment on the Jira story). Kept as a kwarg now so
+    # HLAM-42 does not break the signature when it begins consuming it.
+    _ = snapshot_id
+
+    try:
+        count_stmt = select(func.count()).select_from(LedgerEntry)
+        total = int((await session.execute(count_stmt)).scalar_one())
+        if total == 0:
+            return ChainVerification(
+                total_entries=0,
+                verified=True,
+                first_divergence_index=None,
+                first_divergence_reason=None,
+            )
+
+        stmt = select(LedgerEntry).order_by(LedgerEntry.id.asc()).execution_options(yield_per=_VERIFY_BATCH_SIZE)
+
+        prior_entry_hash: bytes | None = None
+        index = 0
+        stream = await session.stream(stmt)
+        async for row in stream.scalars():
+            if len(row.entry_hash) != _ENTRY_HASH_BYTES:
+                return ChainVerification(
+                    total_entries=total,
+                    verified=False,
+                    first_divergence_index=index,
+                    first_divergence_reason=(
+                        f"entry_hash at index {index} has invalid length: {len(row.entry_hash)} (expected {_ENTRY_HASH_BYTES})"
+                    ),
+                )
+
+            try:
+                envelope = _envelope_for_row(row)
+                recomputed = sha256(canonicalize(envelope))
+            except CanonicalEncodingError as exc:
+                # Programming errors (e.g. _serialize_utc_z's naive-datetime
+                # guard) intentionally propagate as LedgerError rather than
+                # being softened into a verification verdict — DB-loaded
+                # TIMESTAMPTZ values are always tz-aware in practice.
+                return ChainVerification(
+                    total_entries=total,
+                    verified=False,
+                    first_divergence_index=index,
+                    first_divergence_reason=f"failed to canonicalize entry at index {index}: {exc}",
+                )
+
+            if recomputed != row.entry_hash:
+                return ChainVerification(
+                    total_entries=total,
+                    verified=False,
+                    first_divergence_index=index,
+                    first_divergence_reason=f"entry_hash mismatch at index {index}",
+                )
+
+            if index == 0:
+                if row.previous_entry_hash is not None:
+                    return ChainVerification(
+                        total_entries=total,
+                        verified=False,
+                        first_divergence_index=0,
+                        first_divergence_reason="genesis must have NULL previous_entry_hash",
+                    )
+            elif row.previous_entry_hash != prior_entry_hash:
+                return ChainVerification(
+                    total_entries=total,
+                    verified=False,
+                    first_divergence_index=index,
+                    first_divergence_reason=f"previous_entry_hash mismatch at index {index}",
+                )
+
+            prior_entry_hash = row.entry_hash
+            index += 1
+
+        return ChainVerification(
+            total_entries=total,
+            verified=True,
+            first_divergence_index=None,
+            first_divergence_reason=None,
+        )
+    finally:
+        # Release the autobegun read transaction. A long-lived session passed
+        # by a CLI tool or batch caller would otherwise hold a read txn open
+        # until the next user action — cheap to clean up, expensive to leak.
+        if session.in_transaction():
+            await session.rollback()
