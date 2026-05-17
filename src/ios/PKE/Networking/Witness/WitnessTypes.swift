@@ -28,3 +28,17 @@ public struct WitnessAttestation: Sendable, Hashable {
         self.rawValue = rawValue
     }
 }
+
+/// Canonical raw bytes of a witness device's signing public key.
+///
+/// Carried separately from `PKECrypto.SigningPublicKey` so the
+/// `PKEWitness` module does not import `PKECrypto`; the rawValue is the
+/// canonical encoded form (P-256 x9.63, 65 bytes) and equality is
+/// byte-wise — same rule the wire protocol uses when comparing identities.
+public struct WitnessSigningKey: Sendable, Hashable {
+    public let rawValue: Data
+
+    public init(rawValue: Data) {
+        self.rawValue = rawValue
+    }
+}
