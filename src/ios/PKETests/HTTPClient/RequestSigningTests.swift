@@ -282,6 +282,7 @@ private struct SampleBody: Encodable {
 /// be tested directly.
 private struct FixturePayload: SignablePayload {
     static let signatureFieldKey = "fixture_signature"
+    static let signingPublicKeyFieldKey = "fixture_signing_public_key"
 
     let snapshotId: String
     let nonceHex: String
