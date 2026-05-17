@@ -16,7 +16,13 @@ from __future__ import annotations
 from pke_backend.schemas.attestation import (
     ProximityClaim,
     WitnessAttestationIn,
+    WitnessAttestationListResponse,
     WitnessAttestationOut,
+)
+from pke_backend.schemas.freezes import (
+    FreezeCreatedResponse,
+    FreezeOut,
+    FreezesListResponse,
 )
 from pke_backend.schemas.key_grant import (
     ECDSA_P1363_SIGNATURE_BYTES,
@@ -26,8 +32,14 @@ from pke_backend.schemas.key_grant import (
     WRAPPED_SNAPSHOT_KEY_BYTES,
     WRAPPING_ALGORITHM_ALLOWLIST,
     KeyGrantIn,
+    KeyGrantListResponse,
     KeyGrantOut,
     PersistedKeyGrant,
+)
+from pke_backend.schemas.reports import (
+    ReportCreatedResponse,
+    ReportOut,
+    ReportsListResponse,
 )
 from pke_backend.schemas.snapshot import (
     OWNER_SIGNING_PUBLIC_KEY_BYTES,
@@ -43,12 +55,20 @@ __all__ = [
     "SIGNING_PUBLIC_KEY_BYTES",
     "WRAPPED_SNAPSHOT_KEY_BYTES",
     "WRAPPING_ALGORITHM_ALLOWLIST",
+    "FreezeCreatedResponse",
+    "FreezeOut",
+    "FreezesListResponse",
     "KeyGrantIn",
+    "KeyGrantListResponse",
     "KeyGrantOut",
     "PersistedKeyGrant",
     "ProximityClaim",
+    "ReportCreatedResponse",
+    "ReportOut",
+    "ReportsListResponse",
     "SnapshotCommitmentIn",
     "SnapshotOut",
     "WitnessAttestationIn",
+    "WitnessAttestationListResponse",
     "WitnessAttestationOut",
 ]

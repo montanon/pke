@@ -31,21 +31,29 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import cast
 
 from sqlalchemy import literal, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pke_backend.api.errors import HTTPError
+from pke_backend.crypto.canonicalize import canonicalize
+from pke_backend.crypto.encoding import b64url_encode
+from pke_backend.crypto.hashing import sha256
 from pke_backend.crypto.types import JsonValue
-from pke_backend.models import Freeze, LedgerEntry, Report
+from pke_backend.models import EventType, Freeze, LedgerEntry, Report
 from pke_backend.protocol.freeze import FreezeAction
 from pke_backend.protocol.ledger import LedgerEventType
 from pke_backend.services.ledger import append_entry
 from pke_backend.services.signing import verify_action_signature
 from pke_backend.services.snapshots import get_snapshot_or_404
 
-__all__ = ["create_freeze", "is_snapshot_frozen"]
+__all__ = [
+    "create_freeze",
+    "is_snapshot_frozen",
+    "list_freezes_for_snapshot",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -170,3 +178,49 @@ async def is_snapshot_frozen(session: AsyncSession, snapshot_id: uuid.UUID) -> b
         select(literal(True)).where(Freeze.snapshot_id == snapshot_id).limit(1),
     )
     return bool(found)
+
+
+def _etag_for_ledger_hashes(ledger_entry_hashes: list[bytes]) -> str:
+    """Same canonical-bytes ETag scheme as the reports/attestations endpoints."""
+    encoded = sorted(b64url_encode(h) for h in ledger_entry_hashes)
+    digest = sha256(canonicalize(cast("JsonValue", encoded)))
+    return f'"{digest.hex()}"'
+
+
+async def list_freezes_for_snapshot(
+    session: AsyncSession,
+    snapshot_id: uuid.UUID,
+) -> tuple[list[Freeze], list[bytes], str]:
+    """Return ``(rows, ledger_entry_hashes, etag)`` for HLAM-82 AC #9.
+
+    UNIQUE(snapshot_id) means there is at most one freeze per snapshot, so
+    the lists hold zero or one entry. The envelope shape stays list-shaped
+    so future schema bumps (e.g. soft-deleted re-freezes) don't break wire
+    compatibility.
+
+    Length mismatch → ``HTTPError(500, "freeze_ledger_inconsistent")``.
+    """
+    rows_result = await session.execute(
+        select(Freeze).where(Freeze.snapshot_id == snapshot_id).order_by(Freeze.created_at.asc(), Freeze.id.asc()),
+    )
+    rows = list(rows_result.scalars().all())
+
+    ledger_result = await session.execute(
+        select(LedgerEntry.entry_hash)
+        .where(
+            LedgerEntry.event_type == EventType.FROZEN,
+            LedgerEntry.snapshot_id == snapshot_id,
+        )
+        .order_by(LedgerEntry.id.asc()),
+    )
+    ledger_hashes = list(ledger_result.scalars().all())
+
+    if len(rows) != len(ledger_hashes):
+        raise HTTPError(
+            500,
+            "freeze_ledger_inconsistent",
+            f"freeze rows ({len(rows)}) and FROZEN ledger entries ({len(ledger_hashes)}) diverged for snapshot {snapshot_id}",
+        )
+
+    etag = _etag_for_ledger_hashes(ledger_hashes)
+    return rows, ledger_hashes, etag

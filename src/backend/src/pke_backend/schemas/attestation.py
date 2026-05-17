@@ -38,7 +38,12 @@ from pke_backend.protocol.types import Base64UrlBytes, UTCDatetime
 if TYPE_CHECKING:
     from pke_backend.models.attestation import WitnessAttestation as _WitnessAttestationORM
 
-__all__ = ["ProximityClaim", "WitnessAttestationIn", "WitnessAttestationOut"]
+__all__ = [
+    "ProximityClaim",
+    "WitnessAttestationIn",
+    "WitnessAttestationListResponse",
+    "WitnessAttestationOut",
+]
 
 # Lengths come from `context/16_canonical_encoding.md` §Binary field encoding
 # on the wire. Witness signing key is uncompressed P-256: `0x04 || X || Y`,
@@ -195,3 +200,16 @@ class WitnessAttestationOut(BaseModel):
             created_at=attestation.created_at,
             ledger_entry_hash=ledger_entry_hash.hex(),
         )
+
+
+class WitnessAttestationListResponse(BaseModel):
+    """GET /snapshots/{id}/attestations response envelope (HLAM-70).
+
+    Always returns a list (possibly empty); the envelope leaves room for
+    pagination metadata if the MVP 500-row cap is ever lifted.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    snapshot_id: str
+    attestations: list[WitnessAttestationOut]

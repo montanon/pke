@@ -117,6 +117,16 @@ class SnapshotOut(BaseModel):
     Timestamps serialise with a ``Z`` suffix to match the wire-format
     convention used in :class:`SnapshotCommitment`. The model is frozen so a
     constructed response cannot be mutated downstream.
+
+    ``frozen`` reflects whether a :class:`pke_backend.models.freeze.Freeze`
+    row exists for ``snapshot_id`` at response time — derived via a LEFT JOIN
+    in :func:`pke_backend.services.snapshots.fetch_snapshot_for_response`. The
+    field is part of the F1/F5 cross-feature contract surfaced by HLAM-65.
+
+    ``blob_url`` is the canonical relative URL the recipient should GET to
+    stream the encrypted blob. It is intentionally relative so the value is
+    portable behind a reverse proxy (the public hostname is the
+    deployment's, not the API's, to advertise).
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -130,6 +140,8 @@ class SnapshotOut(BaseModel):
     session_nonce: str
     version: str
     blob_storage_uri: str
+    blob_url: str
+    frozen: bool
     created_at: datetime
     owner_signature: str
     ledger_entry_hash: str
@@ -146,12 +158,18 @@ class SnapshotOut(BaseModel):
         cls,
         snapshot: Snapshot,
         ledger_entry_hash: bytes,
+        *,
+        frozen: bool = False,
     ) -> SnapshotOut:
         """Adapt a persisted :class:`Snapshot` row + ledger anchor into a response.
 
         ``ledger_entry_hash`` is the bytes produced by the F1 ledger append in
         the same transaction — it isn't part of the ORM row because it belongs
         to the ledger table, not the snapshots table.
+
+        ``frozen`` defaults to ``False`` so existing call sites (the unit
+        tests in this package, future POST handler) keep working without
+        churn; HLAM-65's GET handler always supplies the joined value.
         """
         metadata_policy = MetadataPolicy.model_validate(snapshot.metadata_policy)
         return cls(
@@ -164,6 +182,8 @@ class SnapshotOut(BaseModel):
             session_nonce=hex_encode(snapshot.session_nonce),
             version=snapshot.version,
             blob_storage_uri=snapshot.blob_storage_uri,
+            blob_url=f"/snapshots/{snapshot.snapshot_id}/blob",
+            frozen=frozen,
             created_at=snapshot.created_at,
             owner_signature=hex_encode(snapshot.owner_signature),
             ledger_entry_hash=hex_encode(ledger_entry_hash),

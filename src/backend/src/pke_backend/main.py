@@ -6,10 +6,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from pke_backend.api.attestations import router as attestations_router
 from pke_backend.api.auth import router as auth_router
 from pke_backend.api.errors import register_exception_handlers
 from pke_backend.api.freezes import router as freezes_router
+from pke_backend.api.key_grants import router as key_grants_router
 from pke_backend.api.reports import router as reports_router
+from pke_backend.api.snapshots import router as snapshots_router
 from pke_backend.config import get_settings
 from pke_backend.db import dispose_engine, get_engine
 from pke_backend.security.errors import (
@@ -54,6 +57,9 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(reports_router)
     app.include_router(freezes_router)
+    app.include_router(snapshots_router)
+    app.include_router(attestations_router)
+    app.include_router(key_grants_router)
 
     return app
 

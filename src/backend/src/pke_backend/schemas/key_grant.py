@@ -42,6 +42,7 @@ __all__ = [
     "WRAPPED_SNAPSHOT_KEY_BYTES",
     "WRAPPING_ALGORITHM_ALLOWLIST",
     "KeyGrantIn",
+    "KeyGrantListResponse",
     "KeyGrantOut",
     "PersistedKeyGrant",
 ]
@@ -195,3 +196,17 @@ class KeyGrantOut(BaseModel):
             created_at=orm_row.created_at,
             ledger_entry_hash=hex_encode(ledger_entry_hash),
         )
+
+
+class KeyGrantListResponse(BaseModel):
+    """GET /key-grants?recipient_encryption_public_key=... envelope (HLAM-75).
+
+    ``recipient_encryption_public_key`` echoes the (validated, base64url)
+    query parameter back to the client so a downstream auditor can correlate
+    the request to the response without re-parsing the URL.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    recipient_encryption_public_key: str
+    grants: list[KeyGrantOut]
