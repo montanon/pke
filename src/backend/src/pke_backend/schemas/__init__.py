@@ -7,11 +7,17 @@ and must not be confused with the API contract models that live here.
 `KeyGrantIn` / `KeyGrantOut` back the `/key-grants` endpoint (HLAM-40) and bind
 `canonical_body_bytes()` for granter-signature verification per HLAM-3
 §Signed-body rule. `SnapshotCommitmentIn` / `SnapshotOut` back `/snapshots`
-(HLAM-62) and follow the same pattern.
+(HLAM-62) and `WitnessAttestationIn` / `WitnessAttestationOut` back
+`/attestations` (HLAM-39); all three follow the same canonical-bytes pattern.
 """
 
 from __future__ import annotations
 
+from pke_backend.schemas.attestation import (
+    ProximityClaim,
+    WitnessAttestationIn,
+    WitnessAttestationOut,
+)
 from pke_backend.schemas.key_grant import (
     ECDSA_P1363_SIGNATURE_BYTES,
     KEY_GRANT_VERSION,
@@ -40,6 +46,9 @@ __all__ = [
     "KeyGrantIn",
     "KeyGrantOut",
     "PersistedKeyGrant",
+    "ProximityClaim",
     "SnapshotCommitmentIn",
     "SnapshotOut",
+    "WitnessAttestationIn",
+    "WitnessAttestationOut",
 ]
