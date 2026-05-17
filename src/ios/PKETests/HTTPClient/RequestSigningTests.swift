@@ -14,7 +14,9 @@
 #if canImport(Security)
 import Foundation
 import XCTest
+import enum Crypto.P256
 import PKECrypto
+import PKEIdentity
 import PKEProtocol
 @testable import PKEHTTPClient
 
@@ -111,7 +113,141 @@ final class RequestSigningTests: XCTestCase {
         )
     }
 
+    // MARK: HLAM-148 AC #1 / #4 — sign + verify round-trip
+
+    func testSignProducesSignatureThatVerifiesOverStrippedCanonicalBytes() throws {
+        let identity = makeIdentity()
+        let payload = FixturePayload(snapshotId: "snap-001", nonceHex: "abcd")
+
+        let signedBytes = try RequestSigning.sign(payload, with: identity)
+        let (signature, strippedBytes) = try extractSignatureAndStrippedBytes(
+            from: signedBytes,
+            signatureKey: FixturePayload.signatureFieldKey
+        )
+
+        // AC #2 — raw P1363 = exactly 64 bytes.
+        XCTAssertEqual(signature.count, 64)
+        // AC #4 — round-trip with HLAM-7 verify against the same key pair.
+        try Signatures.verify(
+            signature,
+            of: strippedBytes,
+            by: identity.signingKey.publicKey
+        )
+    }
+
+    // MARK: HLAM-148 AC #3 — bytes signed over payload minus signature field
+
+    func testSignStripsExistingSignatureFieldBeforeHashing() throws {
+        let identity = makeIdentity()
+        let bogus = String(repeating: "A", count: 86) // ≈ 64 bytes b64url
+        let payload = FixturePayload(
+            snapshotId: "snap-001",
+            nonceHex: "abcd",
+            existingSignature: bogus
+        )
+
+        let signedBytes = try RequestSigning.sign(payload, with: identity)
+        let (signature, strippedBytes) = try extractSignatureAndStrippedBytes(
+            from: signedBytes,
+            signatureKey: FixturePayload.signatureFieldKey
+        )
+
+        // Verifies against payload-minus-signature bytes — the bogus value
+        // was excluded from the hash input.
+        try Signatures.verify(signature, of: strippedBytes, by: identity.signingKey.publicKey)
+
+        // And does not verify against bytes that still include the bogus
+        // signature — proof the signing input excluded it.
+        let bytesWithBogus = try CanonicalJSON.encode(payload.toJSONValue())
+        XCTAssertThrowsError(
+            try Signatures.verify(
+                signature,
+                of: bytesWithBogus,
+                by: identity.signingKey.publicKey
+            )
+        )
+    }
+
+    // MARK: HLAM-148 AC #1 — protocol payload type conformances
+
+    func testProtocolPayloadsConformWithCorrectSignatureFieldKeys() {
+        XCTAssertEqual(SnapshotCommitment.signatureFieldKey, "owner_signature")
+        XCTAssertEqual(WitnessAttestation.signatureFieldKey, "witness_signature")
+        XCTAssertEqual(KeyGrant.signatureFieldKey, "grant_signature")
+    }
+
+    // MARK: HLAM-148 AC #1 — end-to-end with a real protocol payload
+
+    func testSnapshotCommitmentSignVerifyRoundTrip() throws {
+        let identity = makeIdentity()
+        let commitment = makeSnapshotCommitment()
+
+        let signedBytes = try RequestSigning.sign(commitment, with: identity)
+        let (signature, strippedBytes) = try extractSignatureAndStrippedBytes(
+            from: signedBytes,
+            signatureKey: SnapshotCommitment.signatureFieldKey
+        )
+
+        XCTAssertEqual(signature.count, 64)
+        try Signatures.verify(signature, of: strippedBytes, by: identity.signingKey.publicKey)
+    }
+
     // MARK: - Helpers
+
+    private func makeIdentity() -> DeviceIdentity {
+        DeviceIdentity(
+            signingKey: P256.Signing.PrivateKey(),
+            agreementKey: P256.KeyAgreement.PrivateKey()
+        )
+    }
+
+    private func makeSnapshotCommitment(
+        ownerSignature: Data = Data()
+    ) -> SnapshotCommitment {
+        SnapshotCommitment(
+            version: "0.1",
+            snapshotId: "snap-test-001",
+            ciphertextHash: Data(repeating: 0xAB, count: 32),
+            ownerSigningPublicKey: Data(repeating: 0xCD, count: 33),
+            ownerEncryptionPublicKey: Data(repeating: 0xEF, count: 33),
+            captureTimestamp: ISO8601UTCDate(Date(timeIntervalSince1970: 0)),
+            metadataPolicy: SnapshotCommitment.MetadataPolicy(
+                locationPublic: true,
+                locationPrecision: nil,
+                mediaType: "image/jpeg"
+            ),
+            sessionNonce: Data(repeating: 0x01, count: 16),
+            ownerSignature: ownerSignature
+        )
+    }
+
+    /// Decodes `signedBytes` back into a JSON object, pulls out the
+    /// base64url-encoded signature stored under `signatureKey`, and
+    /// returns it alongside the canonical bytes of the same object
+    /// **with the signature entry stripped**. These are the two halves
+    /// that `Signatures.verify` consumes.
+    private func extractSignatureAndStrippedBytes(
+        from signedBytes: Data,
+        signatureKey: String
+    ) throws -> (signature: Data, stripped: Data) {
+        let parsed = try JSONValue.decode(signedBytes)
+        guard case .object(let pairs) = parsed else {
+            throw TestFailure.notAnObject
+        }
+        let signatureEntry = pairs.first { $0.0 == signatureKey }
+        guard case .string(let signatureString)? = signatureEntry?.1 else {
+            throw TestFailure.missingSignature
+        }
+        let signature = try Base64URL.decode(signatureString)
+        let strippedPairs = pairs.filter { $0.0 != signatureKey }
+        let stripped = try CanonicalJSON.encode(.object(strippedPairs))
+        return (signature, stripped)
+    }
+
+    private enum TestFailure: Error {
+        case notAnObject
+        case missingSignature
+    }
 
     /// Walks up from this test file to `src/ios/PKE/Networking`. The path is
     /// derived from `#filePath` so it works regardless of where the test
@@ -130,7 +266,7 @@ final class RequestSigningTests: XCTestCase {
     }
 }
 
-// MARK: - Fixture
+// MARK: - Fixtures
 
 /// Two-field `Encodable` whose declared order (`zeta` before `alpha`)
 /// differs from the canonical order, so any failure to sort keys surfaces
@@ -138,5 +274,36 @@ final class RequestSigningTests: XCTestCase {
 private struct SampleBody: Encodable {
     let zeta: Int
     let alpha: String
+}
+
+/// Minimal `SignablePayload` used to exercise `RequestSigning.sign` without
+/// the surrounding ceremony of constructing a full protocol payload. Carries
+/// an optional pre-existing signature so the strip-before-hash behaviour can
+/// be tested directly.
+private struct FixturePayload: SignablePayload {
+    static let signatureFieldKey = "fixture_signature"
+
+    let snapshotId: String
+    let nonceHex: String
+    let existingSignature: String?
+
+    init(snapshotId: String, nonceHex: String, existingSignature: String? = nil) {
+        self.snapshotId = snapshotId
+        self.nonceHex = nonceHex
+        self.existingSignature = existingSignature
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case snapshotId = "snapshot_id"
+        case nonceHex = "nonce_hex"
+        case fixtureSignature = "fixture_signature"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(snapshotId, forKey: .snapshotId)
+        try container.encode(nonceHex, forKey: .nonceHex)
+        try container.encodeIfPresent(existingSignature, forKey: .fixtureSignature)
+    }
 }
 #endif
