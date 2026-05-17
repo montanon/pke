@@ -266,16 +266,17 @@ final class AEADTests: XCTestCase {
            ) {
             urls.append(contentsOf: contents.filter { $0.pathExtension == "json" })
         }
-        if urls.isEmpty,
-           let flattened = Bundle.module.urls(
-            forResourcesWithExtension: "json",
-            subdirectory: "test_vectors/aes_gcm"
-           ) {
-            urls.append(contentsOf: flattened)
+        if urls.isEmpty {
+            urls.append(contentsOf: BundleResourceURLs.jsonResources(
+                in: .module,
+                subdirectory: "test_vectors/aes_gcm"
+            ))
         }
-        if urls.isEmpty,
-           let flat = Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: nil) {
-            urls.append(contentsOf: flat)
+        if urls.isEmpty {
+            urls.append(contentsOf: BundleResourceURLs.jsonResources(
+                in: .module,
+                subdirectory: nil
+            ))
         }
         // SwiftPM's `.process` flattens the resource tree, so the canonical
         // subdirectory lookup can come up empty even when the JSONs are

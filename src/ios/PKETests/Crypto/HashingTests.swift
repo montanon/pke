@@ -86,16 +86,18 @@ private func loadSha256Vectors(subdirectory: String) throws -> [LoadedSha256Vect
        ) {
         urls.append(contentsOf: contents.filter { $0.pathExtension == "json" })
     }
-    if urls.isEmpty,
-       let flattened = Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: subdirectory) {
-        urls.append(contentsOf: flattened)
+    if urls.isEmpty {
+        urls.append(
+            contentsOf: BundleResourceURLs.jsonResources(in: .module, subdirectory: subdirectory)
+        )
     }
     // SwiftPM's `.process` flattens the resource tree, so subdirectory
     // lookups return empty. Fall back to a flat search; schema-decoding
     // gates inclusion to sha256-shaped fixtures only.
-    if urls.isEmpty,
-       let flat = Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: nil) {
-        urls.append(contentsOf: flat)
+    if urls.isEmpty {
+        urls.append(
+            contentsOf: BundleResourceURLs.jsonResources(in: .module, subdirectory: nil)
+        )
     }
     let decoder = JSONDecoder()
     var loaded: [LoadedSha256Vector] = []
