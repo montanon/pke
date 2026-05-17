@@ -62,9 +62,12 @@ struct PKERootView: View {
         case .recipientGrants:
             RecipientGrantsView()
         case .settings:
-            PlaceholderRouteView(title: "Settings", subtitle: "Owned by HLAM-43 Story 5.")
+            // SettingsView requires a SettingsViewModel built from
+            // DeviceIdentity bytes; identity wiring into the root view
+            // is a follow-up. The placeholder remains until that lands.
+            PlaceholderRouteView(title: "Settings", subtitle: "Pending DeviceIdentity wiring at the root.")
         case .limitations:
-            PlaceholderRouteView(title: "Limitations", subtitle: "Owned by HLAM-43 Story 5.")
+            LimitationsView()
         }
     }
 }

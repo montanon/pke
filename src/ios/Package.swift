@@ -10,7 +10,7 @@
 //   PKEWitness     — transport-agnostic witness flow
 //   PKEHTTPClient  — backend REST transport (Apple platforms only)
 //   PKESession     — @MainActor identity-session wrapper (Apple platforms only)
-//   PKEApp         — SwiftUI navigation skeleton (UIKit-gated app entry)
+//   PKEApp         — SwiftUI navigation skeleton + Settings/Limitations screens
 //
 // Cross-platform notes:
 //
@@ -20,9 +20,12 @@
 //     dependents resolve.
 //
 //   - PKEApp gates the `@main App` type with `#if canImport(UIKit) &&
-//     canImport(SwiftUI)`, so the library compiles on Linux as an
-//     effectively empty translation unit while the navigation-state
-//     machine remains testable on macOS.
+//     canImport(SwiftUI)`, the views with `#if canImport(SwiftUI)`, and
+//     `UIKitPasteboardWriter` with `#if canImport(UIKit)`. On Linux the
+//     library compiles as an effectively empty translation unit while the
+//     pure-data types (Role, AppRoute, Limitations, Fingerprint,
+//     BundleInfo, SettingsViewModel, PasteboardWriting, NoopPasteboardWriter)
+//     and the navigation-state machine remain testable on macOS.
 //
 //   - PKECryptoTests and PKEProtocolTests carry the shared test-vector
 //     corpus via symlinks under their `Resources/` directory, surfaced as
@@ -101,18 +104,23 @@ let package = Package(
             ],
             path: "PKE/Services/Session"
         ),
-        // PKEApp — SwiftUI navigation skeleton (HLAM-92).
+        // PKEApp — SwiftUI navigation skeleton (HLAM-92) + Settings/Limitations
+        // screens (HLAM-95).
         //
         // Hosts the AppRoute enum, AppNavigationState ObservableObject,
-        // role-selection view, and placeholder role screens. Sources span
-        // two sibling directories under PKE/ — `App/` for state &
-        // routing, `Views/` for SwiftUI views — declared via the
+        // role-selection view, placeholder role screens, plus the Settings
+        // and Limitations screens (`SettingsView`, `LimitationsView`) and
+        // their support layer (`Fingerprint`, `Limitations`, `BundleInfo`,
+        // `PasteboardWriting`, `SettingsViewModel`). Sources span two
+        // sibling directories under PKE/ — `App/` for state & routing,
+        // `Views/` for SwiftUI views and helpers — declared via the
         // `sources:` array so the target picks up both without
         // overlapping the sibling library targets above. The `@main App`
         // type in PKEApp.swift is gated `#if canImport(UIKit)` so the
         // library still compiles on Linux CI as an empty TU.
         .target(
             name: "PKEApp",
+            dependencies: ["PKECrypto"],
             path: "PKE",
             sources: ["App", "Views"]
         ),
