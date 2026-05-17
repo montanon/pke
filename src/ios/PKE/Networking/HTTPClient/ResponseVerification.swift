@@ -14,8 +14,8 @@
 // in HLAM-148.
 
 #if canImport(Security)
-import Crypto
 import Foundation
+import enum Crypto.P256
 import PKECrypto
 import PKEProtocol
 
