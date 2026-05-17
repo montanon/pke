@@ -37,6 +37,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pke_backend.api.errors import HTTPError
+from pke_backend.crypto.types import JsonValue
 from pke_backend.models import Freeze, LedgerEntry, Report
 from pke_backend.protocol.freeze import FreezeAction
 from pke_backend.protocol.ledger import LedgerEventType
@@ -74,7 +75,7 @@ def _parse_freeze_uuid(value: str) -> uuid.UUID:
         raise HTTPError(422, "invalid_payload", "freeze_id is not a valid UUID") from exc
 
 
-def _ledger_payload(action: FreezeAction) -> dict[str, object]:
+def _ledger_payload(action: FreezeAction) -> dict[str, JsonValue]:
     """Return the canonical-body dict (action minus the signature field)."""
     body = action.to_json_value()
     if not isinstance(body, dict):  # pragma: no cover

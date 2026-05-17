@@ -43,7 +43,10 @@ class ReasonCategory(StrEnum):
 class ReportAction(ToJsonValueMixin):
     model_config = ConfigDict(extra="forbid")
     type: Literal["report"]
-    version: str
+    # ``version`` is pinned to the locked v0.1 value per
+    # ``context/16_canonical_encoding.md``: any mismatch would change the
+    # canonical body, so the spec mandates explicit rejection.
+    version: Literal["0.1"]
     report_id: str
     snapshot_id: str
     reason_category: ReasonCategory

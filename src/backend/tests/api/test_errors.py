@@ -15,7 +15,12 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from pke_backend.api.errors import HTTPError, register_exception_handlers
-from pke_backend.crypto.errors import SignatureFormatError, SignatureVerificationError
+from pke_backend.crypto.errors import (
+    CanonicalEncodingError,
+    EncodingError,
+    SignatureFormatError,
+    SignatureVerificationError,
+)
 
 
 class _Payload(BaseModel):
@@ -37,6 +42,14 @@ def _build_app() -> FastAPI:
     @app.get("/raise-sig-verify")
     def _raise_sig_verify() -> None:
         raise SignatureVerificationError(reason="signature did not validate")
+
+    @app.get("/raise-encoding")
+    def _raise_encoding() -> None:
+        raise EncodingError(reason="length 65 == 65 but alphabet check fails on byte 12")
+
+    @app.get("/raise-canonical-encoding")
+    def _raise_canonical_encoding() -> None:
+        raise CanonicalEncodingError(reason="nesting exceeds MAX_DEPTH=64")
 
     @app.post("/typed-body")
     def _typed_body(payload: _Payload) -> dict[str, int]:
@@ -113,3 +126,38 @@ async def test_validation_detail_is_truncated_for_very_large_inputs(
     body: dict[str, Any] = response.json()
     # Cap is 512 + the truncation marker; allow generous slack.
     assert len(body["detail"]) < 1024
+
+
+@pytest.mark.asyncio
+async def test_validation_detail_does_not_echo_raw_input(
+    client: httpx.AsyncClient,
+) -> None:
+    """STRIDE info-disclosure: raw input bytes must not round-trip into the response."""
+    sentinel = "secret-bytes-do-not-echo"
+    async with client:
+        response = await client.post("/typed-body", json={"n": sentinel})
+    assert response.status_code == 422
+    body: dict[str, Any] = response.json()
+    assert sentinel not in body["detail"]
+
+
+@pytest.mark.asyncio
+async def test_encoding_error_maps_to_422(client: httpx.AsyncClient) -> None:
+    async with client:
+        response = await client.get("/raise-encoding")
+    assert response.status_code == 422
+    body: dict[str, Any] = response.json()
+    assert body["error"] == "invalid_payload"
+    # The validator's ``reason`` (which contains lengths / alphabet hints) must
+    # not appear in the response body.
+    assert "65" not in body["detail"]
+    assert "alphabet" not in body["detail"]
+
+
+@pytest.mark.asyncio
+async def test_canonical_encoding_error_maps_to_422(client: httpx.AsyncClient) -> None:
+    async with client:
+        response = await client.get("/raise-canonical-encoding")
+    assert response.status_code == 422
+    body: dict[str, Any] = response.json()
+    assert body["error"] == "invalid_payload"

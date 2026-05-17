@@ -24,7 +24,12 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from pke_backend.crypto.errors import SignatureFormatError, SignatureVerificationError
+from pke_backend.crypto.errors import (
+    CanonicalEncodingError,
+    EncodingError,
+    SignatureFormatError,
+    SignatureVerificationError,
+)
 
 __all__ = ["HTTPError", "error_envelope", "register_exception_handlers"]
 
@@ -54,7 +59,8 @@ def error_envelope(error: str, detail: str) -> dict[str, str]:
 
 
 async def _handle_http_error(_: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, HTTPError)
+    if not isinstance(exc, HTTPError):  # pragma: no cover — dispatched by FastAPI
+        raise TypeError(f"unexpected exception class {type(exc).__name__}")
     return JSONResponse(
         status_code=exc.status_code,
         content=error_envelope(exc.error, exc.detail),
@@ -66,24 +72,61 @@ async def _handle_signature_error(_: Request, exc: Exception) -> JSONResponse:
     # 401: from the client's perspective, the request did not prove possession
     # of the claimed signing key. The detail string deliberately omits the
     # underlying ``reason`` to avoid leaking validator internals.
-    assert isinstance(exc, (SignatureFormatError, SignatureVerificationError))
+    if not isinstance(exc, (SignatureFormatError, SignatureVerificationError)):  # pragma: no cover
+        raise TypeError(f"unexpected exception class {type(exc).__name__}")
     return JSONResponse(
         status_code=401,
         content=error_envelope("signature_invalid", "signature verification failed"),
     )
 
 
-async def _handle_validation_error(_: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, RequestValidationError)
-    # ``RequestValidationError.errors()`` may include the offending input value
-    # in ``ctx``; truncate to keep the response size bounded and avoid echoing
-    # large or sensitive blobs.
-    detail = str(exc.errors())
+def _sanitize_validation_errors(exc: RequestValidationError) -> str:
+    """Build a safe ``detail`` string from a Pydantic validation error.
+
+    Pydantic's ``errors()`` payload includes the offending ``input`` value
+    verbatim per failing field. For binary fields (signatures, pubkeys, etc.)
+    that means the request body's raw bytes would round-trip into the
+    response. We project to ``loc + type + msg`` and drop ``input``/``ctx``.
+    """
+    safe = [
+        {
+            "loc": ".".join(str(part) for part in err.get("loc", ())),
+            "type": err.get("type", ""),
+            "msg": err.get("msg", ""),
+        }
+        for err in exc.errors()
+    ]
+    detail = str(safe)
     if len(detail) > _VALIDATION_DETAIL_MAX_CHARS:
         detail = detail[:_VALIDATION_DETAIL_MAX_CHARS] + "...[truncated]"
+    return detail
+
+
+async def _handle_validation_error(_: Request, exc: Exception) -> JSONResponse:
+    if not isinstance(exc, RequestValidationError):  # pragma: no cover — dispatched by FastAPI
+        raise TypeError(f"unexpected exception class {type(exc).__name__}")
     return JSONResponse(
         status_code=422,
-        content=error_envelope("invalid_payload", detail),
+        content=error_envelope("invalid_payload", _sanitize_validation_errors(exc)),
+    )
+
+
+async def _handle_encoding_error(_: Request, exc: Exception) -> JSONResponse:
+    """Map crypto decode errors (raised inside Pydantic validators) to 422.
+
+    ``EncodingError`` (and its parent ``CanonicalEncodingError``) is not a
+    ``ValueError``, so Pydantic v2 does not wrap it into ``ValidationError``.
+    Without this handler a malformed base64url field on a request body would
+    surface as a 500 — see ``protocol/types.py::_decode_b64url``.
+
+    The detail string deliberately omits ``exc.reason`` to avoid echoing the
+    failure mode (length, alphabet) back to the client.
+    """
+    if not isinstance(exc, (EncodingError, CanonicalEncodingError)):  # pragma: no cover
+        raise TypeError(f"unexpected exception class {type(exc).__name__}")
+    return JSONResponse(
+        status_code=422,
+        content=error_envelope("invalid_payload", "binary field decode failed"),
     )
 
 
@@ -96,3 +139,5 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(SignatureFormatError, _handle_signature_error)
     app.add_exception_handler(SignatureVerificationError, _handle_signature_error)
     app.add_exception_handler(RequestValidationError, _handle_validation_error)
+    app.add_exception_handler(EncodingError, _handle_encoding_error)
+    app.add_exception_handler(CanonicalEncodingError, _handle_encoding_error)

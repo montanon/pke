@@ -121,9 +121,7 @@ def owner_keypair() -> ec.EllipticCurvePrivateKey:
 
 
 @pytest.fixture
-async def seed_snapshot_id(
-    session: AsyncSession, owner_keypair: ec.EllipticCurvePrivateKey
-) -> uuid.UUID:
+async def seed_snapshot_id(session: AsyncSession, owner_keypair: ec.EllipticCurvePrivateKey) -> uuid.UUID:
     """Insert a minimal :class:`Snapshot` row keyed to ``owner_keypair``.
 
     The owner's public key is stored on the row so a test can use

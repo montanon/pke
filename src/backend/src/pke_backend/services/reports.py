@@ -45,6 +45,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pke_backend.api.errors import HTTPError
+from pke_backend.crypto.types import JsonValue
 from pke_backend.models import LedgerEntry, Report
 from pke_backend.protocol.ledger import LedgerEventType
 from pke_backend.protocol.report_action import ReportAction
@@ -73,7 +74,7 @@ def _parse_uuid(value: str, *, status: int, error_code: str, what: str) -> uuid.
         raise HTTPError(status, error_code, f"{what} is not a valid UUID") from exc
 
 
-def _ledger_payload(action: ReportAction) -> dict[str, object]:
+def _ledger_payload(action: ReportAction) -> dict[str, JsonValue]:
     """Return the canonical-body dict (action minus the signature field).
 
     The ledger service canonicalizes this dict to derive ``payload_hash``
@@ -104,12 +105,8 @@ async def create_report(
             global exception layer and mapped to 401.
 
     """
-    snapshot_uuid = _parse_uuid(
-        action.snapshot_id, status=404, error_code="snapshot_not_found", what="snapshot_id"
-    )
-    report_uuid = _parse_uuid(
-        action.report_id, status=422, error_code="invalid_payload", what="report_id"
-    )
+    snapshot_uuid = _parse_uuid(action.snapshot_id, status=404, error_code="snapshot_not_found", what="snapshot_id")
+    report_uuid = _parse_uuid(action.report_id, status=422, error_code="invalid_payload", what="report_id")
 
     await get_snapshot_or_404(session, snapshot_uuid)
     verify_action_signature(
@@ -133,9 +130,7 @@ async def create_report(
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
-        raise HTTPError(
-            409, "report_id_conflict", "report_id already exists"
-        ) from exc
+        raise HTTPError(409, "report_id_conflict", "report_id already exists") from exc
 
     entry = await append_entry(
         event_type=LedgerEventType.REPORTED,

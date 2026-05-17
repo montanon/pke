@@ -19,7 +19,7 @@ import httpx
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pke_backend.crypto.encoding import b64url_decode, b64url_encode
 from pke_backend.models import EventType, Freeze, LedgerEntry, Report
@@ -87,6 +87,42 @@ async def test_post_freeze_happy_path(
     assert [e.event_type for e in entries] == [EventType.REPORTED, EventType.FROZEN]
     assert entries[1].entry_hash == b64url_decode(body["ledger_entry_hash"])
     assert entries[1].previous_entry_hash == entries[0].entry_hash
+
+
+# --- Snapshot lookup branch on freeze (parity with /reports) -------------
+
+
+async def test_post_freeze_rejects_unknown_snapshot(
+    client: httpx.AsyncClient,
+    session: AsyncSession,
+    freezer_keypair: ec.EllipticCurvePrivateKey,
+) -> None:
+    """Freeze with a snapshot_id no row resolves to → 404 snapshot_not_found."""
+    payload = build_signed_freeze(
+        snapshot_id=uuid.uuid4(),
+        triggered_by=str(uuid.uuid4()),
+        signer=freezer_keypair,
+    )
+    response = await client.post("/freezes", json=payload)
+    assert response.status_code == 404
+    assert response.json()["error"] == "snapshot_not_found"
+    assert (await session.execute(select(Freeze))).scalars().first() is None
+
+
+async def test_post_freeze_rejects_non_uuid_snapshot_id(
+    client: httpx.AsyncClient,
+    session: AsyncSession,
+    freezer_keypair: ec.EllipticCurvePrivateKey,
+) -> None:
+    payload = build_signed_freeze(
+        snapshot_id=uuid.uuid4(),
+        triggered_by=str(uuid.uuid4()),
+        signer=freezer_keypair,
+    )
+    payload["snapshot_id"] = "not-a-uuid"
+    response = await client.post("/freezes", json=payload)
+    assert response.status_code == 404
+    assert response.json()["error"] == "snapshot_not_found"
 
 
 # --- AC #5 — triggered_by report missing ----------------------------------
@@ -209,7 +245,6 @@ async def test_post_freeze_rejects_invalid_signature(
 async def test_concurrent_freezes_serialize(
     client: httpx.AsyncClient,
     session: AsyncSession,
-    engine: AsyncEngine,
     seed_snapshot_id: uuid.UUID,
     reporter_keypair: ec.EllipticCurvePrivateKey,
     freezer_keypair: ec.EllipticCurvePrivateKey,
@@ -239,6 +274,12 @@ async def test_concurrent_freezes_serialize(
 
     freezes = (await session.execute(select(Freeze))).scalars().all()
     assert len(freezes) == 1
+    # Pin which submission won: the persisted row's freeze_id must be one of
+    # the two payloads, not an arbitrary third UUID.
+    winning_freeze_ids = {uuid.UUID(payload_a["freeze_id"]), uuid.UUID(payload_b["freeze_id"])}
+    assert freezes[0].freeze_id in winning_freeze_ids
+    winning_triggered = {uuid.UUID(payload_a["triggered_by"]), uuid.UUID(payload_b["triggered_by"])}
+    assert freezes[0].triggered_by_report_id in winning_triggered
 
     entries = (await session.execute(select(LedgerEntry).order_by(LedgerEntry.id))).scalars().all()
     frozen_entries = [e for e in entries if e.event_type is EventType.FROZEN]

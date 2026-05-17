@@ -34,7 +34,9 @@ FREEZE_VERSION: Final[str] = "0.1"
 class FreezeAction(ToJsonValueMixin):
     model_config = ConfigDict(extra="forbid")
     type: Literal["freeze"]
-    version: str
+    # ``version`` pinned to the locked v0.1 value per
+    # ``context/16_canonical_encoding.md`` (see ``ReportAction.version``).
+    version: Literal["0.1"]
     freeze_id: str
     snapshot_id: str
     triggered_by: str
