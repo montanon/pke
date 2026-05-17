@@ -11,7 +11,7 @@ repos:
         args: ["--maxkb=1024"]
       - id: check-merge-conflict
       - id: detect-private-key
-        exclude: "^src/shared/test_vectors/.*\\.json$"
+        exclude: "^(src/shared/test_vectors/.*\\.json|src/shared/tools/generate_vectors\\.py)$"
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.13
@@ -25,4 +25,4 @@ repos:
     hooks:
       - id: detect-secrets
         args: ["--baseline", ".secrets.baseline"]
-        exclude: "^(context/examples/.*\\.json|src/shared/test_vectors/.*\\.json|scripts/generate_test_vectors\\.py)$"
+        exclude: "^(context/examples/.*\\.json|src/shared/test_vectors/.*\\.json|src/shared/tools/generate_vectors\\.py)$"
