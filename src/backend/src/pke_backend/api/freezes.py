@@ -11,11 +11,12 @@ from pke_backend.crypto.encoding import b64url_encode
 from pke_backend.db import get_session
 from pke_backend.protocol.freeze import FreezeAction
 from pke_backend.schemas.freezes import FreezeCreatedResponse
+from pke_backend.security.dependencies import require_user
 from pke_backend.services.freezes import create_freeze
 
 __all__ = ["router"]
 
-router = APIRouter(prefix="/freezes", tags=["freezes"])
+router = APIRouter(prefix="/freezes", tags=["freezes"], dependencies=[Depends(require_user)])
 
 
 @router.post("", status_code=201, response_model=FreezeCreatedResponse)

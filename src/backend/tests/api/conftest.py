@@ -73,6 +73,9 @@ _BACKEND_DIR = Path(__file__).resolve().parents[2]
 _ALEMBIC_INI = _BACKEND_DIR / "alembic.ini"
 
 # All API integration tables — TRUNCATE order doesn't matter under CASCADE.
+# ``sessions`` and ``users`` are listed so the bearer fixture starts each
+# test from a clean auth state (HLAM-122 S8 wires require_user onto the
+# POST routers).
 _API_TABLES = (
     "freezes",
     "reports",
@@ -80,6 +83,8 @@ _API_TABLES = (
     "witness_attestations",
     "ledger_entries",
     "snapshots",
+    "sessions",
+    "users",
 )
 
 
@@ -319,9 +324,39 @@ async def seed_key_grant(
 
 
 @pytest.fixture
-async def client() -> AsyncIterator[httpx.AsyncClient]:
+async def unauth_client() -> AsyncIterator[httpx.AsyncClient]:
+    """Raw client with no ``Authorization`` header.
+
+    Used by the 401 negative tests for HLAM-122 S8: posting to the
+    protected custody routes (``/reports``, ``/freezes``) without a
+    bearer token must return 401 ``unauthenticated``.
+    """
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+
+
+@pytest.fixture
+async def client() -> AsyncIterator[httpx.AsyncClient]:
+    """Pre-authenticated client used by every protected-route test.
+
+    HLAM-122 S8 wires ``Depends(require_user)`` onto the POST custody
+    routers (``/reports``, ``/freezes``). To avoid threading a bearer
+    token through every existing call site, the shared ``client``
+    fixture registers a throwaway user on the way in and sets the
+    resulting token as the default ``Authorization`` header. The
+    read-only GET custody routers ignore the header per the design
+    contract in ``context/05_data_model_public.md``.
+    """
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        username = f"u{uuid.uuid4().hex[:12]}"
+        resp = await c.post(
+            "/v1/auth/register",
+            json={"username": username, "password": "supersecret-pw"},  # pragma: allowlist secret
+        )
+        assert resp.status_code == 201, resp.text
+        c.headers["Authorization"] = f"Bearer {resp.json()['token']}"
         yield c
 
 
