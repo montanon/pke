@@ -30,6 +30,15 @@
     "examples/report.example.json",
     "examples/freeze.example.json"
   ],
+  "schema_files": [
+    "src/shared/schemas/freeze.json",
+    "src/shared/schemas/key_grant.json",
+    "src/shared/schemas/ledger_entry.json",
+    "src/shared/schemas/report.json",
+    "src/shared/schemas/snapshot_commitment.json",
+    "src/shared/schemas/verification_report.json",
+    "src/shared/schemas/witness_attestation.json"
+  ],
   "asset_files": [
     "assets/architecture_public.mmd",
     "assets/custody_flow_public.mmd"

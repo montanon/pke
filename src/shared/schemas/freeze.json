@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Freeze",
+  "type": "object",
+  "required": [
+    "type",
+    "version",
+    "freeze_id",
+    "snapshot_id",
+    "triggered_by",
+    "frozen_by_signing_public_key",
+    "freeze_timestamp",
+    "freeze_signature"
+  ],
+  "properties": {
+    "type": { "const": "freeze" },
+    "version": { "type": "string" },
+    "freeze_id": { "type": "string" },
+    "snapshot_id": { "type": "string" },
+    "triggered_by": { "type": "string" },
+    "frozen_by_signing_public_key": { "type": "string" },
+    "freeze_timestamp": { "type": "string", "format": "date-time" },
+    "freeze_signature": { "type": "string" }
+  },
+  "additionalProperties": false
+}
