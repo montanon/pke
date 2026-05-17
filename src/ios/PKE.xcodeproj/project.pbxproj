@@ -7,12 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A1B0000000000000000000A0 /* PKEApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A0000000000000000000A0 /* PKEApp.swift */; };
-		A1B0000000000000000000A1 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A0000000000000000000A1 /* ContentView.swift */; };
+		A1B0000000000000000000A5 /* PKEAppHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A0000000000000000000A5 /* PKEAppHost.swift */; };
 		A1B0000000000000000000A2 /* PKECrypto in Frameworks */ = {isa = PBXBuildFile; productRef = C100000000000000000000C1 /* PKECrypto */; };
 		A1B0000000000000000000A3 /* PKEIdentity in Frameworks */ = {isa = PBXBuildFile; productRef = C100000000000000000000C2 /* PKEIdentity */; };
 		A1B0000000000000000000A4 /* PKEProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = C100000000000000000000C3 /* PKEProtocol */; };
+		A1B0000000000000000000A6 /* PKEApp in Frameworks */ = {isa = PBXBuildFile; productRef = C100000000000000000000C4 /* PKEApp */; };
 		B1B0000000000000000000B0 /* PlaceholderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000B0 /* PlaceholderTests.swift */; };
+		B1B0000000000000000000B1 /* PKEApp in Frameworks */ = {isa = PBXBuildFile; productRef = C100000000000000000000C5 /* PKEApp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -26,8 +27,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A1A0000000000000000000A0 /* PKEApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PKEApp.swift; sourceTree = "<group>"; };
-		A1A0000000000000000000A1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A1A0000000000000000000A5 /* PKEAppHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PKEAppHost.swift; sourceTree = "<group>"; };
 		A1A0000000000000000000A2 /* PKE.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PKE.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1A0000000000000000000B0 /* PlaceholderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceholderTests.swift; sourceTree = "<group>"; };
 		B1A0000000000000000000B2 /* PKEAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PKEAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -38,6 +38,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B0000000000000000000A6 /* PKEApp in Frameworks */,
 				A1B0000000000000000000A2 /* PKECrypto in Frameworks */,
 				A1B0000000000000000000A3 /* PKEIdentity in Frameworks */,
 				A1B0000000000000000000A4 /* PKEProtocol in Frameworks */,
@@ -48,6 +49,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B1B0000000000000000000B1 /* PKEApp in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -57,35 +59,18 @@
 		D110000000000000000000D0 /* */ = {
 			isa = PBXGroup;
 			children = (
-				D110000000000000000000D1 /* PKE */,
+				D110000000000000000000D6 /* PKEAppHost */,
 				D110000000000000000000D4 /* PKEAppTests */,
 				D110000000000000000000D5 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		D110000000000000000000D1 /* PKE */ = {
+		D110000000000000000000D6 /* PKEAppHost */ = {
 			isa = PBXGroup;
 			children = (
-				D110000000000000000000D2 /* App */,
-				D110000000000000000000D3 /* Views */,
+				A1A0000000000000000000A5 /* PKEAppHost.swift */,
 			);
-			path = PKE;
-			sourceTree = "<group>";
-		};
-		D110000000000000000000D2 /* App */ = {
-			isa = PBXGroup;
-			children = (
-				A1A0000000000000000000A0 /* PKEApp.swift */,
-			);
-			path = App;
-			sourceTree = "<group>";
-		};
-		D110000000000000000000D3 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				A1A0000000000000000000A1 /* ContentView.swift */,
-			);
-			path = Views;
+			path = PKEAppHost;
 			sourceTree = "<group>";
 		};
 		D110000000000000000000D4 /* PKEAppTests */ = {
@@ -125,6 +110,7 @@
 				C100000000000000000000C1 /* PKECrypto */,
 				C100000000000000000000C2 /* PKEIdentity */,
 				C100000000000000000000C3 /* PKEProtocol */,
+				C100000000000000000000C4 /* PKEApp */,
 			);
 			productName = PKE;
 			productReference = A1A0000000000000000000A2 /* PKE.app */;
@@ -144,6 +130,9 @@
 				B100000000000000000000B4 /* PBXTargetDependency */,
 			);
 			name = PKEAppTests;
+			packageProductDependencies = (
+				C100000000000000000000C5 /* PKEApp */,
+			);
 			productName = PKEAppTests;
 			productReference = B1A0000000000000000000B2 /* PKEAppTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -211,8 +200,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1B0000000000000000000A1 /* ContentView.swift in Sources */,
-				A1B0000000000000000000A0 /* PKEApp.swift in Sources */,
+				A1B0000000000000000000A5 /* PKEAppHost.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -503,6 +491,14 @@
 		C100000000000000000000C3 /* PKEProtocol */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PKEProtocol;
+		};
+		C100000000000000000000C4 /* PKEApp */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PKEApp;
+		};
+		C100000000000000000000C5 /* PKEApp */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PKEApp;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

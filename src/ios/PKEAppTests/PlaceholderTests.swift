@@ -1,5 +1,5 @@
+import PKEApp
 import XCTest
-@testable import PKE
 
 final class PlaceholderTests: XCTestCase {
 

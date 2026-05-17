@@ -15,6 +15,7 @@ from typing import Annotated, Any, cast
 from pydantic import BaseModel, BeforeValidator, PlainSerializer
 
 from pke_backend.crypto.encoding import b64url_decode, b64url_encode
+from pke_backend.crypto.errors import EncodingError
 from pke_backend.crypto.types import JsonValue
 
 __all__ = ["Base64UrlBytes", "ToJsonValueMixin", "UTCDatetime"]
@@ -24,7 +25,12 @@ def _decode_b64url(value: Any) -> bytes:
     if isinstance(value, bytes):
         return value
     if isinstance(value, str):
-        return b64url_decode(value)
+        # Pydantic only converts ValueError/AssertionError/PydanticCustomError into
+        # ValidationError; wrap EncodingError so callers see a single failure mode.
+        try:
+            return b64url_decode(value)
+        except EncodingError as exc:
+            raise ValueError(str(exc)) from exc
     # Raise ValueError (not TypeError) so Pydantic wraps into ValidationError.
     raise ValueError(f"expected str or bytes, got {type(value).__name__}")
 

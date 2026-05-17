@@ -1,17 +1,25 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from pke_backend.config import Settings, get_settings
 
 
 def test_defaults_match_env_sample(monkeypatch: pytest.MonkeyPatch) -> None:
-    for var in ("PKE_DATABASE_URL", "PKE_DEBUG", "PKE_ALLOWED_ORIGINS"):
+    for var in (
+        "PKE_DATABASE_URL",
+        "PKE_DEBUG",
+        "PKE_ALLOWED_ORIGINS",
+        "PKE_BLOB_ROOT",
+    ):
         monkeypatch.delenv(var, raising=False)
     s = Settings()
     assert s.DATABASE_URL == "postgresql+asyncpg://pke:pke@localhost:5432/pke"  # pragma: allowlist secret
     assert s.DEBUG is False
     assert s.ALLOWED_ORIGINS == ["http://localhost:3000"]
+    assert Path("./blobs") == s.BLOB_ROOT
 
 
 def test_debug_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -54,3 +62,15 @@ def test_cache_clear_picks_up_new_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PKE_DEBUG", "true")
     get_settings.cache_clear()
     assert get_settings().DEBUG is True
+
+
+def test_blob_root_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("PKE_BLOB_ROOT", raising=False)
+    get_settings.cache_clear()
+    assert Path("./blobs") == get_settings().BLOB_ROOT
+
+
+def test_blob_root_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PKE_BLOB_ROOT", "/tmp/pke-blobs")
+    get_settings.cache_clear()
+    assert Path("/tmp/pke-blobs") == get_settings().BLOB_ROOT
