@@ -331,13 +331,14 @@ fileprivate extension SnapshotEndpointsTests {
         { request in
             // swiftlint:disable:next force_unwrapping
             let url = request.url!
-            // swiftlint:disable:next force_unwrapping
-            let response = HTTPURLResponse(
+            let optionalResponse = HTTPURLResponse(
                 url: url,
                 statusCode: 200,
                 httpVersion: "HTTP/1.1",
                 headerFields: nil
-            )!
+            )
+            // swiftlint:disable:next force_unwrapping
+            let response = optionalResponse!
             return (response, bytes)
         }
     }
