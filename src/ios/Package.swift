@@ -10,6 +10,7 @@
 //   PKEWitness     — transport-agnostic witness flow
 //   PKEHTTPClient  — backend REST transport (Apple platforms only)
 //   PKESession     — @MainActor identity-session wrapper (Apple platforms only)
+//   PKEApp         — SwiftUI navigation skeleton (UIKit-gated app entry)
 //
 // Cross-platform notes:
 //
@@ -17,6 +18,11 @@
 //     `#if canImport(Security)` so the modules compile to empty translation
 //     units on Linux. The libraries are still declared on every platform so
 //     dependents resolve.
+//
+//   - PKEApp gates the `@main App` type with `#if canImport(UIKit) &&
+//     canImport(SwiftUI)`, so the library compiles on Linux as an
+//     effectively empty translation unit while the navigation-state
+//     machine remains testable on macOS.
 //
 //   - PKECryptoTests and PKEProtocolTests carry the shared test-vector
 //     corpus via symlinks under their `Resources/` directory, surfaced as
@@ -49,7 +55,8 @@ let package = Package(
         .library(name: "PKEIdentity", targets: ["PKEIdentity"]),
         .library(name: "PKEWitness", targets: ["PKEWitness"]),
         .library(name: "PKEHTTPClient", targets: ["PKEHTTPClient"]),
-        .library(name: "PKESession", targets: ["PKESession"])
+        .library(name: "PKESession", targets: ["PKESession"]),
+        .library(name: "PKEApp", targets: ["PKEApp"])
     ],
     dependencies: [
         .package(
@@ -93,6 +100,21 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto")
             ],
             path: "PKE/Services/Session"
+        ),
+        // PKEApp — SwiftUI navigation skeleton (HLAM-92).
+        //
+        // Hosts the AppRoute enum, AppNavigationState ObservableObject,
+        // role-selection view, and placeholder role screens. Sources span
+        // two sibling directories under PKE/ — `App/` for state &
+        // routing, `Views/` for SwiftUI views — declared via the
+        // `sources:` array so the target picks up both without
+        // overlapping the sibling library targets above. The `@main App`
+        // type in PKEApp.swift is gated `#if canImport(UIKit)` so the
+        // library still compiles on Linux CI as an empty TU.
+        .target(
+            name: "PKEApp",
+            path: "PKE",
+            sources: ["App", "Views"]
         ),
         .testTarget(
             name: "PKECryptoTests",
@@ -148,6 +170,11 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto")
             ],
             path: "PKETests/Session"
+        ),
+        .testTarget(
+            name: "PKEAppTests",
+            dependencies: ["PKEApp"],
+            path: "PKETests/App"
         )
     ]
 )

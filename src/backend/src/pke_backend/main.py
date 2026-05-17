@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from pke_backend.config import get_settings
 from pke_backend.db import dispose_engine, get_engine
+from pke_backend.security.errors import UnauthenticatedError, unauthenticated_handler
 
 
 @asynccontextmanager
@@ -29,6 +30,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_exception_handler(UnauthenticatedError, unauthenticated_handler)
 
     @app.get("/health")
     def health() -> dict[str, str]:
