@@ -198,11 +198,26 @@ private func loadCanonicalJSONVectors(subdirectory: String) throws -> [Canonical
        let flattened = Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: subdirectory) {
         urls.append(contentsOf: flattened)
     }
+    // SwiftPM's `.process` flattens the resource tree, so the canonical
+    // subdirectory lookup can come up empty even when the JSONs are present.
+    // Fall back to a flat search and let schema-decoding gate inclusion.
+    if urls.isEmpty,
+       let flat = Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: nil) {
+        urls.append(contentsOf: flat)
+    }
     let decoder = JSONDecoder()
     var loaded: [CanonicalVector] = []
     for url in urls.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-        let data = try Data(contentsOf: url)
-        let bundle = try decoder.decode(CanonicalBundle.self, from: data)
+        guard let data = try? Data(contentsOf: url),
+              let bundle = try? decoder.decode(CanonicalBundle.self, from: data) else {
+            continue
+        }
+        // A canonical_json fixture is identified by having either a
+        // structured `inputs.value` (positives) or `inputs.raw_utf8_hex`
+        // (negatives). Bundles missing both belong to other primitives.
+        guard bundle.inputs.value != nil || bundle.inputs.rawUTF8Hex != nil else {
+            continue
+        }
         loaded.append(CanonicalVector(url: url, bundle: bundle))
     }
     return loaded
