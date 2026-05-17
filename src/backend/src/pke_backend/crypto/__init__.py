@@ -5,6 +5,13 @@ Surfaces declared here are stable imports for downstream HLAM-5 stories.
 
 from __future__ import annotations
 
+from pke_backend.crypto.canonicalize import canonicalize
+from pke_backend.crypto.encoding import (
+    b64url_decode,
+    b64url_encode,
+    hex_decode,
+    hex_encode,
+)
 from pke_backend.crypto.errors import (
     AEADError,
     CanonicalEncodingError,
@@ -15,6 +22,7 @@ from pke_backend.crypto.errors import (
     SignatureVerificationError,
     WrapError,
 )
+from pke_backend.crypto.hashing import sha256, verify_hash_chain
 from pke_backend.crypto.types import JsonValue
 
 __all__ = [
@@ -27,4 +35,11 @@ __all__ = [
     "SignatureFormatError",
     "SignatureVerificationError",
     "WrapError",
+    "b64url_decode",
+    "b64url_encode",
+    "canonicalize",
+    "hex_decode",
+    "hex_encode",
+    "sha256",
+    "verify_hash_chain",
 ]
