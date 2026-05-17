@@ -18,11 +18,12 @@ from pke_backend.crypto.encoding import b64url_encode
 from pke_backend.db import get_session
 from pke_backend.protocol.report_action import ReportAction
 from pke_backend.schemas.reports import ReportCreatedResponse
+from pke_backend.security.dependencies import require_user
 from pke_backend.services.reports import create_report
 
 __all__ = ["router"]
 
-router = APIRouter(prefix="/reports", tags=["reports"])
+router = APIRouter(prefix="/reports", tags=["reports"], dependencies=[Depends(require_user)])
 
 
 @router.post("", status_code=201, response_model=ReportCreatedResponse)
