@@ -64,6 +64,7 @@ from pke_backend.models.attestation import WITNESS_ATTESTATION_VERSION
 from pke_backend.protocol.freeze import FREEZE_VERSION, FreezeAction
 from pke_backend.protocol.report_action import REPORT_VERSION, ReportAction
 from pke_backend.schemas.attestation import WitnessAttestationIn
+from pke_backend.schemas.key_grant import KEY_GRANT_VERSION, KeyGrantIn
 from pke_backend.schemas.snapshot import SnapshotCommitmentIn
 from pke_backend.services.blob_storage import (
     FilesystemBlobStore,
@@ -494,6 +495,55 @@ def build_signed_attestation(
     body = attestation.canonical_body_bytes()
     sig = p256_sign(body, witness_signer)
     base["witness_signature"] = b64url_encode(sig)
+    return base
+
+
+def build_signed_key_grant(
+    *,
+    snapshot_id: uuid.UUID,
+    owner_signer: ec.EllipticCurvePrivateKey,
+    recipient_encryption_public_key: bytes | None = None,
+    wrapped_snapshot_key: bytes | None = None,
+    wrapping_algorithm: str = "ecdhp256+aesgcm256",
+    grant_id: uuid.UUID | None = None,
+    grant_timestamp: str = "2026-05-15T00:03:00Z",
+) -> dict[str, Any]:
+    """Build a wire-form dict for a signed :class:`KeyGrantIn`, ready to POST.
+
+    Mirrors :func:`build_signed_report` / :func:`build_signed_commitment`.
+    ``owner_signer`` is the snapshot owner's keypair — its public key is
+    embedded as ``granted_by_signing_public_key`` so the service-layer
+    owner check passes. Defaults supply the locked-v0.1 wrapping algorithm
+    and protocol-compliant 60-byte wrapped key.
+    """
+    owner_pubkey = _uncompressed_pubkey_bytes(owner_signer)
+    recipient_pub = (
+        recipient_encryption_public_key if recipient_encryption_public_key is not None else (b"\x04" + b"\x88" * 64)
+    )
+    wrapped = (
+        wrapped_snapshot_key
+        if wrapped_snapshot_key is not None
+        else (
+            b"\x01" * 12 + b"\x02" * 32 + b"\x03" * 16  # 12-byte nonce + 32-byte ct + 16-byte tag = 60 bytes
+        )
+    )
+    gid = grant_id if grant_id is not None else uuid.uuid4()
+    base: dict[str, Any] = {
+        "type": "key_grant",
+        "version": KEY_GRANT_VERSION,
+        "grant_id": str(gid),
+        "snapshot_id": str(snapshot_id),
+        "recipient_encryption_public_key": b64url_encode(recipient_pub),
+        "wrapped_snapshot_key": b64url_encode(wrapped),
+        "wrapping_algorithm": wrapping_algorithm,
+        "granted_by_signing_public_key": b64url_encode(owner_pubkey),
+        "grant_timestamp": grant_timestamp,
+        "grant_signature": b64url_encode(b"\x00" * 64),
+    }
+    grant = KeyGrantIn.model_validate(base)
+    body = canonical_signed_body(grant, "grant_signature")
+    sig = p256_sign(body, owner_signer)
+    base["grant_signature"] = b64url_encode(sig)
     return base
 
 
