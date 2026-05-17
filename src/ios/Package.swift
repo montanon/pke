@@ -47,7 +47,8 @@ let package = Package(
         .library(name: "PKEProtocol", targets: ["PKEProtocol"]),
         .library(name: "PKEIdentity", targets: ["PKEIdentity"]),
         .library(name: "PKEWitness", targets: ["PKEWitness"]),
-        .library(name: "PKEHTTPClient", targets: ["PKEHTTPClient"])
+        .library(name: "PKEHTTPClient", targets: ["PKEHTTPClient"]),
+        .library(name: "PKEUI", targets: ["PKEUI"])
     ],
     dependencies: [
         .package(
@@ -81,6 +82,11 @@ let package = Package(
             name: "PKEHTTPClient",
             dependencies: ["PKEIdentity", "PKECrypto"],
             path: "PKE/Networking/HTTPClient"
+        ),
+        .target(
+            name: "PKEUI",
+            dependencies: ["PKECrypto"],
+            path: "PKE/Views"
         ),
         .testTarget(
             name: "PKECryptoTests",
@@ -123,6 +129,11 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto")
             ],
             path: "PKETests/HTTPClient"
+        ),
+        .testTarget(
+            name: "PKEUITests",
+            dependencies: ["PKEUI"],
+            path: "PKETests/UI"
         )
     ]
 )
