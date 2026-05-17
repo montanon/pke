@@ -74,7 +74,7 @@ public enum RequestSigning {
         with identity: DeviceIdentity
     ) throws -> Data {
         let jsonValue = try payload.toJSONValue()
-        guard case .object(let pairs) = jsonValue else {
+        guard case let .object(pairs) = jsonValue else {
             throw CryptoError.canonicalEncoding(
                 reason: "signable payload must be a JSON object at the root"
             )

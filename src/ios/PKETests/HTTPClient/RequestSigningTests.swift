@@ -231,11 +231,11 @@ final class RequestSigningTests: XCTestCase {
         signatureKey: String
     ) throws -> (signature: Data, stripped: Data) {
         let parsed = try JSONValue.decode(signedBytes)
-        guard case .object(let pairs) = parsed else {
+        guard case let .object(pairs) = parsed else {
             throw TestFailure.notAnObject
         }
         let signatureEntry = pairs.first { $0.0 == signatureKey }
-        guard case .string(let signatureString)? = signatureEntry?.1 else {
+        guard case let .string(signatureString)? = signatureEntry?.1 else {
             throw TestFailure.missingSignature
         }
         let signature = try Base64URL.decode(signatureString)
