@@ -74,7 +74,11 @@ let package = Package(
         ),
         .testTarget(
             name: "PKEIdentityTests",
-            dependencies: ["PKEIdentity"],
+            dependencies: [
+                "PKEIdentity",
+                "PKECrypto",
+                .product(name: "Crypto", package: "swift-crypto")
+            ],
             path: "PKETests/Identity"
         )
     ]

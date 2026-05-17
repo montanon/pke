@@ -14,6 +14,7 @@ public enum CryptoError: Error, Equatable, Sendable {
     case aead(reason: String)
     case wrap(reason: String)
     case keychain(reason: String)
+    case identity(reason: String)
 }
 
 extension CryptoError: CustomStringConvertible {
@@ -35,6 +36,8 @@ extension CryptoError: CustomStringConvertible {
             return "wrap: \(reason)"
         case .keychain(let reason):
             return "keychain: \(reason)"
+        case .identity(let reason):
+            return "identity: \(reason)"
         }
     }
 }
