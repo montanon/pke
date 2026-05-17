@@ -9,13 +9,14 @@ import XCTest
 // MARK: - Test doubles
 
 /// Minimal stub used to prove the protocol surface is implementable and to
-/// exercise the `stop()`-before-emit cancellation path. Lives in the test
-/// target so it never ships in the production module.
+/// exercise both `stop()` cancellation paths (capturer-side stream and
+/// witness-side awaiting call). Lives in the test target so it never ships
+/// in the production module.
 private final class NoOpTransport: WitnessTransport, @unchecked Sendable {
     let transportID: String
 
     private var capturerContinuation: AsyncStream<WitnessAttestation>.Continuation?
-    private var witnessTask: Task<Void, Error>?
+    private var witnessContinuation: CheckedContinuation<Void, Never>?
 
     init(transportID: String = "noop") {
         self.transportID = transportID
@@ -24,23 +25,23 @@ private final class NoOpTransport: WitnessTransport, @unchecked Sendable {
     func runCapturer(session: WitnessSession) -> AsyncStream<WitnessAttestation> {
         AsyncStream { continuation in
             self.capturerContinuation = continuation
-            continuation.onTermination = { _ in }
         }
     }
 
     func runWitness(
         sign: @escaping @Sendable (WitnessSession) async throws -> WitnessAttestation
     ) async throws {
-        // Blocks until stop() is called (or the surrounding Task is cancelled).
-        try await withTaskCancellationHandler {
-            try await Task.sleep(nanoseconds: .max)
-        } onCancel: { }
+        // Suspends until stop() resumes the stored continuation.
+        await withCheckedContinuation { continuation in
+            self.witnessContinuation = continuation
+        }
     }
 
     func stop() async {
         capturerContinuation?.finish()
         capturerContinuation = nil
-        witnessTask?.cancel()
+        witnessContinuation?.resume()
+        witnessContinuation = nil
     }
 }
 
@@ -119,6 +120,22 @@ final class WitnessTransportStubTests: XCTestCase {
             collected.append(attestation)
         }
         XCTAssertTrue(collected.isEmpty)
+    }
+
+    // MARK: stop() unblocks an awaiting runWitness call
+
+    func test_runWitness_returnsWhenStopIsCalled() async throws {
+        let transport = NoOpTransport()
+        let witnessTask = Task<Void, Error> {
+            try await transport.runWitness { _ in
+                XCTFail("sign should not be invoked in this stub")
+                return WitnessAttestation(rawValue: Data())
+            }
+        }
+        // Yield once so the task reaches the suspension point before stop().
+        await Task.yield()
+        await transport.stop()
+        try await witnessTask.value
     }
 
     // MARK: Edge case #2 — runWitness propagates sign-closure errors
