@@ -27,6 +27,8 @@ adapter is forgiving on the surface a third-party witness might extend.
 
 from __future__ import annotations
 
+import uuid
+from enum import Enum
 from typing import TYPE_CHECKING, Annotated, Final, Literal, cast
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
@@ -39,11 +41,23 @@ if TYPE_CHECKING:
     from pke_backend.models.attestation import WitnessAttestation as _WitnessAttestationORM
 
 __all__ = [
+    "MAX_BATCH_ATTESTATIONS",
+    "AcceptedAttestation",
+    "AttestationBatchRequest",
+    "AttestationBatchResponse",
+    "AttestationRejectionReason",
     "ProximityClaim",
+    "RejectedAttestation",
     "WitnessAttestationIn",
     "WitnessAttestationListResponse",
     "WitnessAttestationOut",
 ]
+
+# HLAM-141: capturer-side cap on attestations per POST. Matches the iOS
+# witness dispatcher's "50 soft cap" within a single 30-second session; the
+# backend enforces it as a hard limit so an over-cap upload is rejected at
+# the schema layer before any signature verification work.
+MAX_BATCH_ATTESTATIONS: Final[int] = 50
 
 # Lengths come from `context/16_canonical_encoding.md` §Binary field encoding
 # on the wire. Witness signing key is uncompressed P-256: `0x04 || X || Y`,
@@ -200,6 +214,85 @@ class WitnessAttestationOut(BaseModel):
             created_at=attestation.created_at,
             ledger_entry_hash=ledger_entry_hash.hex(),
         )
+
+
+class AttestationRejectionReason(str, Enum):
+    """Per-item rejection reasons for ``POST /snapshots/{id}/attestations``.
+
+    Narrow set on purpose — every code is paired with a deterministic check
+    in :func:`pke_backend.services.attestations.create_attestations_batch`,
+    so clients can branch on the reason without parsing free-form text.
+    """
+
+    SNAPSHOT_MISMATCH = "snapshot_mismatch"
+    SIGNATURE_INVALID = "signature_invalid"
+    DUPLICATE_WITNESS_KEY = "duplicate_witness_key"
+    VERSION_UNSUPPORTED = "version_unsupported"
+
+
+class AttestationBatchRequest(BaseModel):
+    """``POST /snapshots/{id}/attestations`` request envelope.
+
+    Wraps the capturer's batch of witness attestations. The 50-item cap
+    fires at the Pydantic layer (``max_length=MAX_BATCH_ATTESTATIONS``) so
+    an over-cap upload is rejected with 422 ``invalid_payload`` before any
+    signature verification work runs.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    attestations: Annotated[
+        list[WitnessAttestationIn],
+        Field(min_length=1, max_length=MAX_BATCH_ATTESTATIONS),
+    ]
+
+
+class AcceptedAttestation(BaseModel):
+    """Per-item entry in the batch response's ``accepted`` list.
+
+    ``index`` is the 0-based position in the request body. ``ledger_entry_hash``
+    is base64url-encoded so the value round-trips with the other POST
+    envelopes in this service (HLAM-79 reports, HLAM-139 snapshots).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    index: int
+    witness_signing_public_key: str
+    ledger_entry_id: uuid.UUID
+    ledger_entry_hash: str
+
+
+class RejectedAttestation(BaseModel):
+    """Per-item entry in the batch response's ``rejected`` list.
+
+    Carries the request-position index, the witness public key (base64url),
+    and the rejection reason. The failing item's ``witness_signature`` and
+    other binary fields are deliberately **not** echoed back to keep the
+    response free of input bytes a client might mishandle in logs.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    index: int
+    witness_signing_public_key: str
+    reason: AttestationRejectionReason
+
+
+class AttestationBatchResponse(BaseModel):
+    """``POST /snapshots/{id}/attestations`` response envelope.
+
+    Each request item shows up in exactly one of ``accepted`` / ``rejected``,
+    preserving the request order (``index`` is the join key). The endpoint
+    always returns 201; clients inspect the two lists to decide whether to
+    retry individual items.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    snapshot_id: uuid.UUID
+    accepted: list[AcceptedAttestation]
+    rejected: list[RejectedAttestation]
 
 
 class WitnessAttestationListResponse(BaseModel):

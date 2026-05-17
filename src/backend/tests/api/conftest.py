@@ -60,8 +60,10 @@ from pke_backend.models import (
     Snapshot,
     WitnessAttestation,
 )
+from pke_backend.models.attestation import WITNESS_ATTESTATION_VERSION
 from pke_backend.protocol.freeze import FREEZE_VERSION, FreezeAction
 from pke_backend.protocol.report_action import REPORT_VERSION, ReportAction
+from pke_backend.schemas.attestation import WitnessAttestationIn
 from pke_backend.schemas.snapshot import SnapshotCommitmentIn
 from pke_backend.services.blob_storage import (
     FilesystemBlobStore,
@@ -437,6 +439,61 @@ def build_signed_commitment(
     body = canonical_signed_body(commitment, "owner_signature")
     sig = p256_sign(body, signer)
     base["owner_signature"] = b64url_encode(sig)
+    return base
+
+
+def build_signed_attestation(
+    *,
+    snapshot_id: uuid.UUID,
+    witness_signer: ec.EllipticCurvePrivateKey,
+    transport: str = "bluetooth",
+    witness_timestamp: str = "2026-05-15T00:01:00Z",
+    proximity_claim: dict[str, Any] | None = None,
+    ciphertext_hash: bytes | None = None,
+    session_nonce: bytes | None = None,
+    owner_signing_public_key: bytes | None = None,
+    version: str = WITNESS_ATTESTATION_VERSION,
+) -> dict[str, Any]:
+    """Build a wire-form dict for a signed witness attestation, ready to POST.
+
+    Mirrors :func:`build_signed_report` / :func:`build_signed_freeze` /
+    :func:`build_signed_commitment`. Writes a zeroed signature first,
+    validates through :class:`WitnessAttestationIn` so length/encoding rules
+    fire the same way they would for a real client, computes the canonical
+    signed body, signs it with ``witness_signer``, and swaps the real
+    signature back in. The fields tied to the snapshot row
+    (``ciphertext_hash``, ``session_nonce``, ``owner_signing_public_key``)
+    default to placeholder bytes — tests that care can override them.
+    """
+    pubkey = _uncompressed_pubkey_bytes(witness_signer)
+    cipher_hash = ciphertext_hash if ciphertext_hash is not None else b"\x11" * CIPHERTEXT_HASH_BYTES
+    nonce = session_nonce if session_nonce is not None else b"\xaa" * SESSION_NONCE_BYTES
+    owner_pub = owner_signing_public_key if owner_signing_public_key is not None else b"\x04" + b"\x22" * 64
+    claim = (
+        proximity_claim
+        if proximity_claim is not None
+        else {
+            "method": "bluetooth-proximity",
+            "exact_location_public": False,
+        }
+    )
+    base: dict[str, Any] = {
+        "type": "witness_attestation",
+        "version": version,
+        "snapshot_id": str(snapshot_id),
+        "ciphertext_hash": b64url_encode(cipher_hash),
+        "session_nonce": b64url_encode(nonce),
+        "owner_signing_public_key": b64url_encode(owner_pub),
+        "witness_signing_public_key": b64url_encode(pubkey),
+        "witness_timestamp": witness_timestamp,
+        "transport": transport,
+        "proximity_claim": claim,
+        "witness_signature": b64url_encode(b"\x00" * 64),
+    }
+    attestation = WitnessAttestationIn.model_validate(base)
+    body = attestation.canonical_body_bytes()
+    sig = p256_sign(body, witness_signer)
+    base["witness_signature"] = b64url_encode(sig)
     return base
 
 

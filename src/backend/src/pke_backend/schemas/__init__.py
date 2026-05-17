@@ -14,7 +14,13 @@ and must not be confused with the API contract models that live here.
 from __future__ import annotations
 
 from pke_backend.schemas.attestation import (
+    MAX_BATCH_ATTESTATIONS,
+    AcceptedAttestation,
+    AttestationBatchRequest,
+    AttestationBatchResponse,
+    AttestationRejectionReason,
     ProximityClaim,
+    RejectedAttestation,
     WitnessAttestationIn,
     WitnessAttestationListResponse,
     WitnessAttestationOut,
@@ -52,11 +58,16 @@ from pke_backend.schemas.snapshot import (
 __all__ = [
     "ECDSA_P1363_SIGNATURE_BYTES",
     "KEY_GRANT_VERSION",
+    "MAX_BATCH_ATTESTATIONS",
     "OWNER_SIGNING_PUBLIC_KEY_BYTES",
     "RECIPIENT_PUBLIC_KEY_BYTES",
     "SIGNING_PUBLIC_KEY_BYTES",
     "WRAPPED_SNAPSHOT_KEY_BYTES",
     "WRAPPING_ALGORITHM_ALLOWLIST",
+    "AcceptedAttestation",
+    "AttestationBatchRequest",
+    "AttestationBatchResponse",
+    "AttestationRejectionReason",
     "BlobUploadedResponse",
     "FreezeCreatedResponse",
     "FreezeOut",
@@ -66,6 +77,7 @@ __all__ = [
     "KeyGrantOut",
     "PersistedKeyGrant",
     "ProximityClaim",
+    "RejectedAttestation",
     "ReportCreatedResponse",
     "ReportOut",
     "ReportsListResponse",
