@@ -16,24 +16,21 @@ final class BundleInfoTests: XCTestCase {
         XCTAssertEqual(info.backendURL, "https://api.example")
     }
 
-    func test_convenienceInit_fallsBackToEmDashForMissingKeys() {
-        let info = BundleInfo(
-            bundle: StubBundle(info: nil),
-            defaults: emptyDefaults()
-        )
+    func test_infoDictionaryInit_fallsBackToEmDashForMissingKeys() {
+        let info = BundleInfo(infoDictionary: nil, defaults: emptyDefaults())
 
         XCTAssertEqual(info.appVersion, "—")
         XCTAssertEqual(info.buildNumber, "—")
         XCTAssertEqual(info.backendURL, "—")
     }
 
-    func test_convenienceInit_readsBundleInfoWhenPresent() {
+    func test_infoDictionaryInit_readsValuesWhenPresent() {
         let info = BundleInfo(
-            bundle: StubBundle(info: [
+            infoDictionary: [
                 "CFBundleShortVersionString": "2.0.1",
                 "CFBundleVersion": "99",
                 "PKEBackendURL": "https://from.bundle"
-            ]),
+            ],
             defaults: emptyDefaults()
         )
 
@@ -42,12 +39,12 @@ final class BundleInfoTests: XCTestCase {
         XCTAssertEqual(info.backendURL, "https://from.bundle")
     }
 
-    func test_convenienceInit_userDefaultsOverridesBundleForBackendURL() {
+    func test_infoDictionaryInit_userDefaultsOverridesBundleForBackendURL() {
         let defaults = emptyDefaults()
         defaults.set("https://from.defaults", forKey: "PKEBackendURL")
 
         let info = BundleInfo(
-            bundle: StubBundle(info: ["PKEBackendURL": "https://from.bundle"]),
+            infoDictionary: ["PKEBackendURL": "https://from.bundle"],
             defaults: defaults
         )
 
@@ -63,18 +60,5 @@ final class BundleInfoTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName)
         defaults?.removePersistentDomain(forName: suiteName)
         return defaults ?? UserDefaults()
-    }
-}
-
-private final class StubBundle: Bundle, @unchecked Sendable {
-    private let stubInfo: [String: Any]?
-
-    init(info: [String: Any]?) {
-        self.stubInfo = info
-        super.init()
-    }
-
-    override var infoDictionary: [String: Any]? {
-        stubInfo
     }
 }

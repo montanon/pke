@@ -25,10 +25,13 @@ public struct BundleInfo: Equatable {
     }
 
     public init(bundle: Bundle = .main, defaults: UserDefaults = .standard) {
-        let info = bundle.infoDictionary
-        let version = info?["CFBundleShortVersionString"] as? String
-        let build = info?["CFBundleVersion"] as? String
-        let bundleBackend = info?["PKEBackendURL"] as? String
+        self.init(infoDictionary: bundle.infoDictionary, defaults: defaults)
+    }
+
+    public init(infoDictionary: [String: Any]?, defaults: UserDefaults = .standard) {
+        let version = infoDictionary?["CFBundleShortVersionString"] as? String
+        let build = infoDictionary?["CFBundleVersion"] as? String
+        let bundleBackend = infoDictionary?["PKEBackendURL"] as? String
         let defaultsBackend = defaults.string(forKey: "PKEBackendURL")
 
         self.appVersion = version ?? "—"
