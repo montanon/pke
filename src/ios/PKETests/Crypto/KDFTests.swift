@@ -83,9 +83,10 @@ final class KDFTests: XCTestCase {
         let ikm = Data(repeating: 0x0b, count: 22)
         let salt = try Self.hexToData("000102030405060708090a0b0c")
         let info = try Self.hexToData("f0f1f2f3f4f5f6f7f8f9")
-        let expected = try Self.hexToData(
-            "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865" // pragma: allowlist secret
-        )
+        // RFC 5869 §A.1 published test vector
+        let expectedHex = "3cb25f25faacd57a90434f64d0362f2a2d2d0a90" // pragma: allowlist secret
+            + "cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865"          // pragma: allowlist secret
+        let expected = try Self.hexToData(expectedHex)
         let key = try KDF.hkdfSHA256(secret: ikm, salt: salt, info: info, length: 42)
         let bytes = key.withUnsafeBytes { Data($0) }
         XCTAssertEqual(bytes, expected)
