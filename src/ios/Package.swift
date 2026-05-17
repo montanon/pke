@@ -19,7 +19,11 @@
 //     pointing at `../../../../shared/test_vectors`. The symlink must
 //     resolve to an existing directory; if `src/shared/test_vectors/` is
 //     missing, SwiftPM will fail resource processing with a clear
-//     "resource not found" error.
+//     "resource not found" error. Note: `.process` flattens every JSON to
+//     the bundle root and `.copy` preserves the symlink verbatim (with a
+//     relative target that no longer resolves from inside the bundle), so
+//     `Bundle.module`-based subdirectory lookups don't work. New vector
+//     runners should resolve fixture paths via `#filePath` instead.
 //
 
 import PackageDescription

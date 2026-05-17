@@ -47,7 +47,7 @@ public enum Signatures {
         }
         let ok = publicKey.isValidSignature(parsed, for: payload)
         if !ok {
-            throw CryptoError.signatureVerification(reason: "verify failed")
+            throw CryptoError.signatureVerification
         }
     }
 }
