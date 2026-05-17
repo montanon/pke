@@ -1,13 +1,20 @@
-"""AES-256-GCM AEAD primitive (test-only).
+"""AES-256-GCM AEAD primitive for the PKE protocol.
 
-Locked to AES-256 (32-byte key), 96-bit (12-byte) nonce, untruncated 128-bit
-(16-byte) tag per ``context/16_canonical_encoding.md`` §AES-256-GCM. The wire
-layout for higher-level callers is ``nonce || ciphertext || tag``; this
-primitive returns and consumes ``ciphertext || tag`` and leaves nonce framing
-to the caller.
+Thin wrapper over ``cryptography.hazmat.primitives.ciphers.aead.AESGCM`` that
+pins the cipher to AES-256-GCM (32-byte key) with a 12-byte nonce and a
+16-byte authentication tag, matching the wire convention used by iOS
+``CryptoKit.AES.GCM`` (`ciphertext || tag`).
 
-Import is restricted to ``src/backend/tests/**`` and ``src/shared/tools/**``
-by the ruff banned-api rule and the AST boundary test.
+All structural problems (wrong types, wrong key length, wrong nonce length,
+truncated ciphertext) raise ``AEADError`` *before* any cipher state is
+constructed. Tag failures from the underlying primitive are mapped onto the
+same error type so that callers never see ``cryptography``'s exceptions and
+``reason`` strings never embed key, plaintext, or tag bytes.
+
+AAD is non-optional in the signature; callers pass ``b""`` for "no AAD".
+This matches the protocol shape — every key-wrap blob binds a context AAD
+and the test vectors in ``src/shared/test_vectors/aes_gcm/`` parameterise
+the empty case explicitly.
 """
 
 from __future__ import annotations
@@ -17,54 +24,67 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from pke_backend.crypto.errors import AEADError
 
-__all__ = ["decrypt", "encrypt"]
+__all__ = ["aead_open", "aead_seal"]
 
-_KEY_LEN = 32
-_NONCE_LEN = 12
-_TAG_LEN = 16
-
-
-def _check_inputs(key: bytes, nonce: bytes) -> None:
-    if not isinstance(key, (bytes, bytearray)):
-        raise AEADError(reason=f"key must be bytes, got {type(key).__name__}")
-    if len(key) != _KEY_LEN:
-        raise AEADError(reason=f"expected {_KEY_LEN}-byte AES-256 key, got {len(key)} bytes")
-    if not isinstance(nonce, (bytes, bytearray)):
-        raise AEADError(reason=f"nonce must be bytes, got {type(nonce).__name__}")
-    if len(nonce) != _NONCE_LEN:
-        raise AEADError(reason=f"expected {_NONCE_LEN}-byte nonce, got {len(nonce)} bytes")
+_KEY_LENGTH = 32
+_NONCE_LENGTH = 12
+_TAG_LENGTH = 16
 
 
-def encrypt(
-    key: bytes,
-    nonce: bytes,
-    plaintext: bytes,
-    aad: bytes | None = None,
-) -> bytes:
-    """Encrypt ``plaintext`` with AES-256-GCM. Returns ``ciphertext || tag``."""
-    _check_inputs(key, nonce)
-    if not isinstance(plaintext, (bytes, bytearray)):
-        raise AEADError(reason=f"plaintext must be bytes, got {type(plaintext).__name__}")
-    if aad is not None and not isinstance(aad, (bytes, bytearray)):
-        raise AEADError(reason=f"aad must be bytes or None, got {type(aad).__name__}")
-    return AESGCM(bytes(key)).encrypt(bytes(nonce), bytes(plaintext), bytes(aad) if aad is not None else None)
+def _ensure_bytes(value: object, name: str) -> bytes:
+    if not isinstance(value, (bytes, bytearray)):
+        raise AEADError(reason=f"{name} must be bytes, got {type(value).__name__}")
+    return bytes(value)
 
 
-def decrypt(
-    key: bytes,
-    nonce: bytes,
-    ciphertext: bytes,
-    aad: bytes | None = None,
-) -> bytes:
-    """Decrypt ``ciphertext || tag`` with AES-256-GCM. Raises ``AEADError`` on auth failure."""
-    _check_inputs(key, nonce)
-    if not isinstance(ciphertext, (bytes, bytearray)):
-        raise AEADError(reason=f"ciphertext must be bytes, got {type(ciphertext).__name__}")
-    if len(ciphertext) < _TAG_LEN:
-        raise AEADError(reason=f"ciphertext shorter than {_TAG_LEN}-byte tag: {len(ciphertext)} bytes")
-    if aad is not None and not isinstance(aad, (bytes, bytearray)):
-        raise AEADError(reason=f"aad must be bytes or None, got {type(aad).__name__}")
+def aead_seal(plaintext: bytes, key: bytes, nonce: bytes, aad: bytes) -> bytes:
+    """Seal ``plaintext`` under AES-256-GCM and return ``ciphertext || tag``.
+
+    ``key`` MUST be 32 bytes, ``nonce`` MUST be 12 bytes, and the returned
+    buffer is ``len(plaintext) + 16``. ``aad`` is non-optional; pass ``b""``
+    to bind no associated data.
+
+    Raises ``AEADError`` for any structural problem (wrong types, wrong key
+    length, wrong nonce length). The underlying primitive cannot fail on
+    seal once inputs are well-formed.
+    """
+    plaintext_b = _ensure_bytes(plaintext, "plaintext")
+    key_b = _ensure_bytes(key, "key")
+    nonce_b = _ensure_bytes(nonce, "nonce")
+    aad_b = _ensure_bytes(aad, "aad")
+    if len(key_b) != _KEY_LENGTH:
+        raise AEADError(reason=f"key must be {_KEY_LENGTH} bytes, got {len(key_b)}")
+    if len(nonce_b) != _NONCE_LENGTH:
+        raise AEADError(reason=f"nonce must be {_NONCE_LENGTH} bytes, got {len(nonce_b)}")
+
+    return AESGCM(key_b).encrypt(nonce_b, plaintext_b, aad_b)
+
+
+def aead_open(ciphertext_and_tag: bytes, key: bytes, nonce: bytes, aad: bytes) -> bytes:
+    """Open a ``ciphertext || tag`` blob and return the plaintext.
+
+    The trailing 16 bytes are interpreted as the GCM tag. ``key`` MUST be
+    32 bytes, ``nonce`` MUST be 12 bytes, and the blob MUST be at least 16
+    bytes to carry the tag.
+
+    Raises ``AEADError`` for any structural problem before verification and
+    for tag-validation failure (tampered ciphertext, tag, nonce, key, or
+    AAD).
+    """
+    blob = _ensure_bytes(ciphertext_and_tag, "ciphertext_and_tag")
+    key_b = _ensure_bytes(key, "key")
+    nonce_b = _ensure_bytes(nonce, "nonce")
+    aad_b = _ensure_bytes(aad, "aad")
+    if len(key_b) != _KEY_LENGTH:
+        raise AEADError(reason=f"key must be {_KEY_LENGTH} bytes, got {len(key_b)}")
+    if len(nonce_b) != _NONCE_LENGTH:
+        raise AEADError(reason=f"nonce must be {_NONCE_LENGTH} bytes, got {len(nonce_b)}")
+    if len(blob) < _TAG_LENGTH:
+        raise AEADError(
+            reason=f"ciphertext_and_tag must be at least {_TAG_LENGTH} bytes, got {len(blob)}",
+        )
+
     try:
-        return AESGCM(bytes(key)).decrypt(bytes(nonce), bytes(ciphertext), bytes(aad) if aad is not None else None)
+        return AESGCM(key_b).decrypt(nonce_b, blob, aad_b)
     except InvalidTag as exc:
-        raise AEADError(reason="AES-GCM tag verification failed") from exc
+        raise AEADError(reason="authentication tag did not validate") from exc
