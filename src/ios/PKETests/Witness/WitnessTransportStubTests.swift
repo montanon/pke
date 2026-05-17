@@ -101,10 +101,10 @@ final class WitnessTransportStubTests: XCTestCase {
     // MARK: Edge case #3 — two transports with the same ID are distinct by identity
 
     func test_twoTransportsWithSameID_areDistinctByIdentity() {
-        let a = NoOpTransport(transportID: "ble")
-        let b = NoOpTransport(transportID: "ble")
-        XCTAssertEqual(a.transportID, b.transportID)
-        XCTAssertNotEqual(ObjectIdentifier(a), ObjectIdentifier(b))
+        let first = NoOpTransport(transportID: "ble")
+        let second = NoOpTransport(transportID: "ble")
+        XCTAssertEqual(first.transportID, second.transportID)
+        XCTAssertNotEqual(ObjectIdentifier(first), ObjectIdentifier(second))
     }
 
     // MARK: Edge case #1 — stop() before emit finishes the stream cleanly with zero values
