@@ -127,8 +127,17 @@ ignore = [
     "PT011", "PT012", "PT017", "PT018", "PT019",
 ]
 
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"pke_backend.crypto.primitives".msg = "test-only; primitives are restricted to src/backend/tests/** and src/shared/tools/**"
+"pke_backend.crypto.primitives.aead".msg = "test-only; primitives are restricted to src/backend/tests/** and src/shared/tools/**"
+"pke_backend.crypto.primitives.keywrap".msg = "test-only; primitives are restricted to src/backend/tests/** and src/shared/tools/**"
+"pke_backend.crypto.primitives.sign".msg = "test-only; primitives are restricted to src/backend/tests/** and src/shared/tools/**"
+
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["D"]
+"tests/**/*.py" = ["D", "TID251"]
+"src/backend/tests/**/*.py" = ["TID251"]
+"src/shared/tools/**/*.py" = ["TID251"]
+"src/backend/src/pke_backend/crypto/primitives/**/*.py" = ["TID251"]
 
 [tool.ruff.format]
 quote-style = "double"

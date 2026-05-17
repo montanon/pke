@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from pke_backend.crypto.canonicalize import canonicalize
@@ -7,6 +10,8 @@ from pke_backend.crypto.encoding import b64url_encode
 from pke_backend.crypto.errors import HashChainError
 from pke_backend.crypto.hashing import sha256, verify_hash_chain
 from pke_backend.crypto.types import JsonValue
+
+SHA256_VECTORS_DIR = Path(__file__).resolve().parents[3] / "shared" / "test_vectors" / "sha256"
 
 GENESIS_PREVIOUS_ENTRY_HASH_B64 = b64url_encode(b"\x00" * 32)
 DUMMY_PAYLOAD_HASH_B64 = b64url_encode(sha256(b"payload"))
@@ -154,3 +159,46 @@ def test_verify_hash_chain_entry_hash_non_string() -> None:
     entry["entry_hash"] = 42
     with pytest.raises(HashChainError):
         verify_hash_chain([entry])
+
+
+def _load_sha256_vector(name: str) -> dict[str, object]:
+    return json.loads((SHA256_VECTORS_DIR / name).read_text())
+
+
+def _sha256_vectors(prefix: str) -> list[str]:
+    return sorted(p.name for p in SHA256_VECTORS_DIR.glob(f"{prefix}*.json"))
+
+
+SHA256_POSITIVE_VECTORS = _sha256_vectors("p")
+SHA256_NEGATIVE_VECTORS = _sha256_vectors("n")
+
+
+def test_sha256_vector_directory_populated() -> None:
+    assert SHA256_POSITIVE_VECTORS, "expected positive sha256 vectors"
+    assert SHA256_NEGATIVE_VECTORS, "expected the negative sha256 vector"
+
+
+@pytest.mark.parametrize("vector", SHA256_POSITIVE_VECTORS)
+def test_sha256_positive_vector_digest_matches(vector: str) -> None:
+    bundle = _load_sha256_vector(vector)
+    assert bundle["valid"] is True
+    inputs = bundle["inputs"]
+    expected = bundle["expected"]
+    assert isinstance(inputs, dict)
+    assert isinstance(expected, dict)
+    message = bytes.fromhex(str(inputs["message_hex"]))
+    assert sha256(message).hex() == expected["digest_hex"]
+
+
+@pytest.mark.parametrize("vector", SHA256_NEGATIVE_VECTORS)
+def test_sha256_negative_vector_digest_diverges(vector: str) -> None:
+    bundle = _load_sha256_vector(vector)
+    assert bundle["valid"] is False
+    inputs = bundle["inputs"]
+    expected = bundle["expected"]
+    assert isinstance(inputs, dict)
+    assert isinstance(expected, dict)
+    message = bytes.fromhex(str(inputs["message_hex"]))
+    # sha256 is total; the documented failure for a corrupted digest is a
+    # byte-mismatch rather than an exception path.
+    assert sha256(message).hex() != expected["digest_hex"]

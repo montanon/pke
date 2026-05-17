@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 import math
+from pathlib import Path
 
 import pytest
 
 from pke_backend.crypto.canonicalize import MAX_DEPTH, canonicalize
 from pke_backend.crypto.errors import CanonicalEncodingError
 from pke_backend.crypto.types import JsonValue
+
+VECTORS_DIR = Path(__file__).resolve().parents[3] / "shared" / "test_vectors" / "canonical_json"
 
 
 def test_empty_dict_returns_braces() -> None:
@@ -189,3 +192,54 @@ def test_deterministic_output_independent_of_insertion_order() -> None:
     b = canonicalize({"c": 3, "a": 1, "b": 2})
     c = canonicalize({"b": 2, "c": 3, "a": 1})
     assert a == b == c
+
+
+def _load_vector(name: str) -> dict[str, object]:
+    return json.loads((VECTORS_DIR / name).read_text())
+
+
+def _vectors(prefix: str) -> list[str]:
+    return sorted(p.name for p in VECTORS_DIR.glob(f"{prefix}*.json"))
+
+
+POSITIVE_VECTORS = _vectors("p")
+NEGATIVE_VECTORS = _vectors("n")
+
+
+def test_canonical_json_vector_directory_populated() -> None:
+    assert POSITIVE_VECTORS, "expected at least one positive canonical_json vector"
+    assert NEGATIVE_VECTORS, "expected the negative canonical_json vector"
+
+
+@pytest.mark.parametrize("vector", POSITIVE_VECTORS)
+def test_positive_vector_canonical_bytes_match(vector: str) -> None:
+    bundle = _load_vector(vector)
+    assert bundle["valid"] is True
+    inputs = bundle["inputs"]
+    expected = bundle["expected"]
+    assert isinstance(inputs, dict)
+    assert isinstance(expected, dict)
+    assert canonicalize(inputs["value"]).hex() == expected["canonical_bytes_hex"]
+
+
+def test_negative_vector_duplicate_key_rejected() -> None:
+    bundle = _load_vector("n1-duplicate-key.json")
+    assert bundle["valid"] is False
+    inputs = bundle["inputs"]
+    expected = bundle["expected"]
+    assert isinstance(inputs, dict)
+    assert isinstance(expected, dict)
+    raw = bytes.fromhex(str(inputs["raw_utf8_hex"]))
+    # Documented failure mode: duplicate keys must be rejected at decode time.
+    with pytest.raises(ValueError):
+        json.loads(raw, object_pairs_hook=_reject_duplicate_keys)
+    assert expected["error"] == "duplicate_key"
+
+
+def _reject_duplicate_keys(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonValue]:
+    seen: set[str] = set()
+    for key, _ in pairs:
+        if key in seen:
+            raise ValueError(f"duplicate key at decode time: {key!r}")
+        seen.add(key)
+    return dict(pairs)
