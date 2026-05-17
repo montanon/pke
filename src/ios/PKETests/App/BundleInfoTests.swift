@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import PKEUI
+@testable import PKEApp
 
 final class BundleInfoTests: XCTestCase {
 
@@ -17,7 +17,7 @@ final class BundleInfoTests: XCTestCase {
     }
 
     func test_infoDictionaryInit_fallsBackToEmDashForMissingKeys() {
-        let info = BundleInfo(infoDictionary: nil, defaults: emptyDefaults())
+        let info = BundleInfo(infoDictionary: nil, defaults: IsolatedDefaults.make())
 
         XCTAssertEqual(info.appVersion, "—")
         XCTAssertEqual(info.buildNumber, "—")
@@ -31,7 +31,7 @@ final class BundleInfoTests: XCTestCase {
                 "CFBundleVersion": "99",
                 "PKEBackendURL": "https://from.bundle"
             ],
-            defaults: emptyDefaults()
+            defaults: IsolatedDefaults.make()
         )
 
         XCTAssertEqual(info.appVersion, "2.0.1")
@@ -40,7 +40,7 @@ final class BundleInfoTests: XCTestCase {
     }
 
     func test_infoDictionaryInit_userDefaultsOverridesBundleForBackendURL() {
-        let defaults = emptyDefaults()
+        let defaults = IsolatedDefaults.make()
         defaults.set("https://from.defaults", forKey: "PKEBackendURL")
 
         let info = BundleInfo(
@@ -49,16 +49,5 @@ final class BundleInfoTests: XCTestCase {
         )
 
         XCTAssertEqual(info.backendURL, "https://from.defaults")
-    }
-
-    // MARK: - Helpers
-
-    private func emptyDefaults() -> UserDefaults {
-        // A dedicated suite avoids polluting the test runner's standard
-        // defaults across cases.
-        let suiteName = "BundleInfoTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)
-        defaults?.removePersistentDomain(forName: suiteName)
-        return defaults ?? UserDefaults()
     }
 }

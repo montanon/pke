@@ -1,4 +1,5 @@
-// HLAM-147 — canonical-encoding integration for the HTTP client.
+// HLAM-147 / HLAM-148 — canonical encoding + request-signing pipeline for
+// the HTTP client.
 //
 // Thin call site that funnels any `Encodable` request body through HLAM-7's
 // `PKECrypto.CanonicalJSON` (via HLAM-10's `toJSONValue()` bridge) and onto
@@ -6,13 +7,17 @@
 // under `Networking/`** — this file owns the integration, not the byte
 // production.
 //
-// `RequestSigning` is the namespace name pinned by the HLAM-49 design.
-// HLAM-148 extends it with the actual signing step (build canonical bytes
-// here, sign over them, embed the signature back into the payload, send).
+// `RequestSigning.sign(_:with:)` (HLAM-148) sits on top of the same
+// canonical pipeline: strip the payload's `*_signature` field, canonicalise
+// what remains, ECDSA-P256-sign the bytes with the local `DeviceIdentity`
+// (raw P1363, 64 bytes, base64url-encoded), re-embed the signature, and
+// return the final canonical bytes. The wire bytes are byte-identical to
+// what the backend computes for the same value.
 
 #if canImport(Security)
 import Foundation
 import PKECrypto
+import PKEIdentity
 import PKEProtocol
 
 public enum RequestSigning {
@@ -46,5 +51,70 @@ public enum RequestSigning {
         request.httpBody = try canonicalBytes(body)
         return request
     }
+
+    // MARK: - HLAM-148 — request signing
+
+    /// Canonicalise `payload` and sign it with the device's ECDSA P-256
+    /// signing key, embedding the resulting signature back into the payload's
+    /// `*_signature` field. The returned bytes are the final canonical-JSON
+    /// wire form (signed) ready to be the body of a request.
+    ///
+    /// Algorithm (matches the backend pipeline in HLAM-16):
+    /// 1. Convert `payload` to `JSONValue`; require an object at the root.
+    /// 2. Drop the entry whose key equals `P.signatureFieldKey`; any prior
+    ///    value (placeholder, stale, attacker-supplied) is discarded.
+    /// 3. Canonical-encode the stripped object — these are the bytes signed.
+    /// 4. ECDSA-P256-sign with `identity.signingKey` (`PKECrypto.Signatures`).
+    ///    The output is raw P1363, exactly 64 bytes.
+    /// 5. base64url-encode the signature; insert it back under
+    ///    `P.signatureFieldKey`.
+    /// 6. Canonical-encode the signed object and return it.
+    public static func sign<P: SignablePayload>(
+        _ payload: P,
+        with identity: DeviceIdentity
+    ) throws -> Data {
+        let jsonValue = try payload.toJSONValue()
+        guard case let .object(pairs) = jsonValue else {
+            throw CryptoError.canonicalEncoding(
+                reason: "signable payload must be a JSON object at the root"
+            )
+        }
+        let signatureKey = P.signatureFieldKey
+
+        let strippedPairs = pairs.filter { $0.0 != signatureKey }
+        let bytesToSign = try CanonicalJSON.encode(.object(strippedPairs))
+
+        let signatureBytes = try Signatures.sign(
+            payload: bytesToSign,
+            with: identity.signingKey
+        )
+        let signatureString = PKECrypto.Base64URL.encode(signatureBytes)
+
+        var signedPairs = strippedPairs
+        signedPairs.append((signatureKey, .string(signatureString)))
+        return try CanonicalJSON.encode(.object(signedPairs))
+    }
+}
+
+// MARK: - SignablePayload protocol + conformances
+
+/// A protocol payload that carries a detached ECDSA signature in a
+/// `*_signature` field. The static `signatureFieldKey` names that field's
+/// canonical (snake_case) JSON key, since each payload type uses its own
+/// (e.g. `owner_signature`, `witness_signature`, `grant_signature`).
+public protocol SignablePayload: Encodable {
+    static var signatureFieldKey: String { get }
+}
+
+extension SnapshotCommitment: SignablePayload {
+    public static var signatureFieldKey: String { "owner_signature" }
+}
+
+extension WitnessAttestation: SignablePayload {
+    public static var signatureFieldKey: String { "witness_signature" }
+}
+
+extension KeyGrant: SignablePayload {
+    public static var signatureFieldKey: String { "grant_signature" }
 }
 #endif

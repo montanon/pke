@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import PKEUI
+@testable import PKEApp
 
 final class FingerprintTests: XCTestCase {
 

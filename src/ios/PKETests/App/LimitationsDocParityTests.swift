@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import PKEUI
+@testable import PKEApp
 
 /// Guards the contract that `Limitations.notMVP` mirrors the
 /// `## Explicitly not MVP` section of `context/09_mvp_scope.md` bullet-for-

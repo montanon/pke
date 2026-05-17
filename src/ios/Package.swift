@@ -10,7 +10,7 @@
 //   PKEWitness     — transport-agnostic witness flow
 //   PKEHTTPClient  — backend REST transport (Apple platforms only)
 //   PKESession     — @MainActor identity-session wrapper (Apple platforms only)
-//   PKEUI          — SwiftUI screens (Settings, Limitations)
+//   PKEApp         — SwiftUI navigation skeleton + Settings/Limitations screens
 //
 // Cross-platform notes:
 //
@@ -19,11 +19,13 @@
 //     units on Linux. The libraries are still declared on every platform so
 //     dependents resolve.
 //
-//   - PKEUI sources are wrapped in `#if canImport(SwiftUI)` (views) and
-//     `#if canImport(UIKit)` (`UIKitPasteboardWriter`); on Linux the module
-//     compiles to a small translation unit containing the pure-data types
-//     (`Limitations`, `Fingerprint`, `BundleInfo`, `SettingsViewModel`,
-//     `PasteboardWriting`, `NoopPasteboardWriter`) only.
+//   - PKEApp gates the `@main App` type with `#if canImport(UIKit) &&
+//     canImport(SwiftUI)`, the views with `#if canImport(SwiftUI)`, and
+//     `UIKitPasteboardWriter` with `#if canImport(UIKit)`. On Linux the
+//     library compiles as an effectively empty translation unit while the
+//     pure-data types (Role, AppRoute, Limitations, Fingerprint,
+//     BundleInfo, SettingsViewModel, PasteboardWriting, NoopPasteboardWriter)
+//     and the navigation-state machine remain testable on macOS.
 //
 //   - PKECryptoTests and PKEProtocolTests carry the shared test-vector
 //     corpus via symlinks under their `Resources/` directory, surfaced as
@@ -57,7 +59,7 @@ let package = Package(
         .library(name: "PKEWitness", targets: ["PKEWitness"]),
         .library(name: "PKEHTTPClient", targets: ["PKEHTTPClient"]),
         .library(name: "PKESession", targets: ["PKESession"]),
-        .library(name: "PKEUI", targets: ["PKEUI"])
+        .library(name: "PKEApp", targets: ["PKEApp"])
     ],
     dependencies: [
         .package(
@@ -102,10 +104,25 @@ let package = Package(
             ],
             path: "PKE/Services/Session"
         ),
+        // PKEApp — SwiftUI navigation skeleton (HLAM-92) + Settings/Limitations
+        // screens (HLAM-95).
+        //
+        // Hosts the AppRoute enum, AppNavigationState ObservableObject,
+        // role-selection view, placeholder role screens, plus the Settings
+        // and Limitations screens (`SettingsView`, `LimitationsView`) and
+        // their support layer (`Fingerprint`, `Limitations`, `BundleInfo`,
+        // `PasteboardWriting`, `SettingsViewModel`). Sources span two
+        // sibling directories under PKE/ — `App/` for state & routing,
+        // `Views/` for SwiftUI views and helpers — declared via the
+        // `sources:` array so the target picks up both without
+        // overlapping the sibling library targets above. The `@main App`
+        // type in PKEApp.swift is gated `#if canImport(UIKit)` so the
+        // library still compiles on Linux CI as an empty TU.
         .target(
-            name: "PKEUI",
+            name: "PKEApp",
             dependencies: ["PKECrypto"],
-            path: "PKE/Views"
+            path: "PKE",
+            sources: ["App", "Views"]
         ),
         .testTarget(
             name: "PKECryptoTests",
@@ -163,9 +180,9 @@ let package = Package(
             path: "PKETests/Session"
         ),
         .testTarget(
-            name: "PKEUITests",
-            dependencies: ["PKEUI"],
-            path: "PKETests/UI"
+            name: "PKEAppTests",
+            dependencies: ["PKEApp"],
+            path: "PKETests/App"
         )
     ]
 )

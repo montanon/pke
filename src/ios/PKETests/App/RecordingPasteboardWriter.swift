@@ -2,7 +2,7 @@
 // tests can assert the copy-button behavior without UIKit.
 
 import Foundation
-@testable import PKEUI
+@testable import PKEApp
 
 final class RecordingPasteboardWriter: PasteboardWriting {
     private(set) var copiedStrings: [String] = []
