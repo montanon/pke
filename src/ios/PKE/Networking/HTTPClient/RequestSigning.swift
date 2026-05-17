@@ -99,22 +99,29 @@ public enum RequestSigning {
 // MARK: - SignablePayload protocol + conformances
 
 /// A protocol payload that carries a detached ECDSA signature in a
-/// `*_signature` field. The static `signatureFieldKey` names that field's
-/// canonical (snake_case) JSON key, since each payload type uses its own
-/// (e.g. `owner_signature`, `witness_signature`, `grant_signature`).
+/// `*_signature` field, signed under the public key carried in
+/// `*_signing_public_key`. The static field keys name those canonical
+/// (snake_case) JSON keys — each payload type uses its own pair
+/// (`owner_signature` + `owner_signing_public_key`,
+/// `witness_signature` + `witness_signing_public_key`,
+/// `grant_signature` + `granted_by_signing_public_key`).
 public protocol SignablePayload: Encodable {
     static var signatureFieldKey: String { get }
+    static var signingPublicKeyFieldKey: String { get }
 }
 
 extension SnapshotCommitment: SignablePayload {
     public static var signatureFieldKey: String { "owner_signature" }
+    public static var signingPublicKeyFieldKey: String { "owner_signing_public_key" }
 }
 
 extension WitnessAttestation: SignablePayload {
     public static var signatureFieldKey: String { "witness_signature" }
+    public static var signingPublicKeyFieldKey: String { "witness_signing_public_key" }
 }
 
 extension KeyGrant: SignablePayload {
     public static var signatureFieldKey: String { "grant_signature" }
+    public static var signingPublicKeyFieldKey: String { "granted_by_signing_public_key" }
 }
 #endif
