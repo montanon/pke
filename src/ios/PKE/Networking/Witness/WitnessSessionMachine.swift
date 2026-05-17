@@ -144,7 +144,11 @@ public actor WitnessSessionMachine {
         nextObserverID += 1
         observers[id] = continuation
         continuation.onTermination = { [weak self] _ in
-            Task { await self?.removeObserver(id) }
+            // Hoist the weak reference into an immutable capture so the
+            // inner concurrent Task closure isn't capturing a `var self`
+            // — Swift 5.9's stricter concurrency check (CI) rejects that.
+            guard let machine = self else { return }
+            Task { await machine.removeObserver(id) }
         }
         continuation.yield(state)
         return stream
