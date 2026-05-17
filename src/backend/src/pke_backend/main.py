@@ -7,6 +7,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from pke_backend.api.auth import router as auth_router
+from pke_backend.api.errors import register_exception_handlers
+from pke_backend.api.freezes import router as freezes_router
+from pke_backend.api.reports import router as reports_router
 from pke_backend.config import get_settings
 from pke_backend.db import dispose_engine, get_engine
 from pke_backend.security.errors import (
@@ -47,6 +50,10 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    register_exception_handlers(app)
+    app.include_router(reports_router)
+    app.include_router(freezes_router)
 
     return app
 
