@@ -9,10 +9,11 @@
 //   PKEIdentity    — Keychain-backed identity (Apple platforms only)
 //   PKEWitness     — transport-agnostic witness flow
 //   PKEHTTPClient  — backend REST transport (Apple platforms only)
+//   PKESession     — @MainActor identity-session wrapper (Apple platforms only)
 //
 // Cross-platform notes:
 //
-//   - PKEIdentity and PKEHTTPClient sources are wrapped in
+//   - PKEIdentity, PKEHTTPClient, and PKESession sources are wrapped in
 //     `#if canImport(Security)` so the modules compile to empty translation
 //     units on Linux. The libraries are still declared on every platform so
 //     dependents resolve.
@@ -47,7 +48,8 @@ let package = Package(
         .library(name: "PKEProtocol", targets: ["PKEProtocol"]),
         .library(name: "PKEIdentity", targets: ["PKEIdentity"]),
         .library(name: "PKEWitness", targets: ["PKEWitness"]),
-        .library(name: "PKEHTTPClient", targets: ["PKEHTTPClient"])
+        .library(name: "PKEHTTPClient", targets: ["PKEHTTPClient"]),
+        .library(name: "PKESession", targets: ["PKESession"])
     ],
     dependencies: [
         .package(
@@ -81,6 +83,16 @@ let package = Package(
             name: "PKEHTTPClient",
             dependencies: ["PKEIdentity", "PKECrypto", "PKEProtocol"],
             path: "PKE/Networking/HTTPClient"
+        ),
+        .target(
+            name: "PKESession",
+            dependencies: [
+                "PKEIdentity",
+                "PKEProtocol",
+                "PKECrypto",
+                .product(name: "Crypto", package: "swift-crypto")
+            ],
+            path: "PKE/Services/Session"
         ),
         .testTarget(
             name: "PKECryptoTests",
@@ -125,6 +137,17 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto")
             ],
             path: "PKETests/HTTPClient"
+        ),
+        .testTarget(
+            name: "PKESessionTests",
+            dependencies: [
+                "PKESession",
+                "PKEIdentity",
+                "PKEProtocol",
+                "PKECrypto",
+                .product(name: "Crypto", package: "swift-crypto")
+            ],
+            path: "PKETests/Session"
         )
     ]
 )
