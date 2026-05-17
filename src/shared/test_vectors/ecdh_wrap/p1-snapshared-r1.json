@@ -1,0 +1,21 @@
+{
+  "name": "p1-snapshared-r1",
+  "inputs": {
+    "snapshot_id": "snap-shared",
+    "snapshot_key_hex": "30eae0ec5230625ca21afa98cdbcea8ff1865ffdc178a201dcb87e5e956b20b1",
+    "sender_private_key_pkcs8_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg3RQ/CInQPQaF+67M\ngyzT5+9cZc437Fnm1zBVKSmdn4ehRANCAAR2RozgO1oViCb5V/J/qL8HQO5eox4/\novOTvD7NTq4UE32VaVhqArdVcck56+N9DoM7xFlchHdzBGbJ/uU2gARz\n-----END PRIVATE KEY-----\n",
+    "sender_public_key_uncompressed_hex": "0476468ce03b5a158826f957f27fa8bf0740ee5ea31e3fa2f393bc3ecd4eae14137d9569586a02b75571c939ebe37d0e833bc4595c8477730466c9fee536800473",
+    "recipient_private_key_pkcs8_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgzgheoFGGVj9vTUZ8\n45NnWS7Kb6X/dwT7lq0P/+zOPnKhRANCAARkIDkchG8OJHL+yve1c9dTjSmUHTGJ\nUhfQmjNnyeEcYQRkiJSznjCHNGqwVPVidTW1B33vyRKFeE0ofGD3k+5V\n-----END PRIVATE KEY-----\n",
+    "recipient_public_key_uncompressed_hex": "046420391c846f0e2472fecaf7b573d7538d29941d31895217d09a3367c9e11c6104648894b39e3087346ab054f5627535b5077defc91285784d287c60f793ee55",
+    "aead_nonce_hex": "a264ff0a8ed7762ccba985dd"
+  },
+  "expected": {
+    "shared_secret_hex": "efb957a73435b791f6754497b46a9a05f4fce0e0da84d2c5adf8b8b21aa410be",
+    "hkdf_info_hex": "706b652f76302e312f6b6579777261702f696e666f000b736e61702d7368617265640041046420391c846f0e2472fecaf7b573d7538d29941d31895217d09a3367c9e11c6104648894b39e3087346ab054f5627535b5077defc91285784d287c60f793ee55",
+    "hkdf_aad_hex": "706b652f76302e312f6b6579777261702f616164000b736e61702d736861726564",
+    "wrapping_key_hex": "a44bbf1e1f376b131cc203875fc20a4b9ac717949b34e3af8cd334b95b282b12",
+    "wrapped_key_hex": "a264ff0a8ed7762ccba985dd3cead51267d220cf607e276f82ad9ab8e951b2be16ed474697139008a24ba44e18be7fc8a47cdbce318c7f8085a12129"
+  },
+  "valid": true,
+  "notes": "End-to-end ecdhp256+aesgcm256 wrap. AEAD nonce is fixed for determinism; production code MUST use a random 12-byte nonce per encryption."
+}

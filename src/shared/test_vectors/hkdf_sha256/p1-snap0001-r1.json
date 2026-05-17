@@ -1,0 +1,15 @@
+{
+  "name": "p1-snap0001-r1",
+  "inputs": {
+    "ikm_hex": "c660c9a5371557cd2bfa36a96b95e756f7c86ce35511f9d48509848b4419ff4a",
+    "snapshot_id": "snap-0001",
+    "recipient_public_key_hex": "046420391c846f0e2472fecaf7b573d7538d29941d31895217d09a3367c9e11c6104648894b39e3087346ab054f5627535b5077defc91285784d287c60f793ee55"
+  },
+  "expected": {
+    "salt_hex": "706b652f76302e312f6b6579777261702f73616c74",
+    "info_hex": "706b652f76302e312f6b6579777261702f696e666f0009736e61702d303030310041046420391c846f0e2472fecaf7b573d7538d29941d31895217d09a3367c9e11c6104648894b39e3087346ab054f5627535b5077defc91285784d287c60f793ee55",
+    "okm_hex": "a9c55997b2cbc2985cf2e3d2cf7b39af98ce6a447d623ea797160129d6dcc8b3"
+  },
+  "valid": true,
+  "notes": "HKDF-SHA256 with salt=b'pke/v0.1/keywrap/salt' and length-prefixed info per HLAM-3 canonical-encoding spec."
+}

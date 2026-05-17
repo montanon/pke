@@ -1,0 +1,11 @@
+{
+  "name": "n1-duplicate-key",
+  "inputs": {
+    "raw_utf8_hex": "7b2261223a312c2261223a327d"
+  },
+  "expected": {
+    "error": "duplicate_key"
+  },
+  "valid": false,
+  "notes": "Decoder MUST reject documents with duplicate keys at the same level. Per HLAM-3 canonical-JSON rules, duplicate keys are invalid on decode."
+}
