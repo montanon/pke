@@ -1,0 +1,15 @@
+{
+  "name": "p1-empty-aad",
+  "inputs": {
+    "key_hex": "12fc56b44c07d7b852d511e87fdf06a8a79d32ed36d0b61c093706043f560ce2",
+    "nonce_hex": "155971fc971298c159b907cc",
+    "aad_hex": "",
+    "plaintext_hex": "68656c6c6f20776f726c64"
+  },
+  "expected": {
+    "ciphertext_hex": "6cd43206e5bdafe3d52b21",
+    "tag_hex": "4363e55d70b1384e29110a8ae9706634"
+  },
+  "valid": true,
+  "notes": "Nonce is fixed for determinism; production code MUST use a random nonce."
+}

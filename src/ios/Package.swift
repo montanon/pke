@@ -2,24 +2,36 @@
 //
 // PKE — iOS Swift Package
 //
-// Declares three library targets and matching test targets:
+// Declares library targets and matching test targets:
 //
-//   PKECrypto    — primitives wrapping swift-crypto / CryptoKit
-//   PKEProtocol  — wire-level snapshot / attestation / ledger types
-//   PKEIdentity  — Keychain-backed identity (Apple platforms only)
+//   PKECrypto      — primitives wrapping swift-crypto / CryptoKit
+//   PKEProtocol    — wire-level snapshot / attestation / ledger types
+//   PKEIdentity    — Keychain-backed identity (Apple platforms only)
+//   PKEWitness     — transport-agnostic witness flow
+//   PKEHTTPClient  — backend REST transport (Apple platforms only)
 //
 // Cross-platform notes:
 //
-//   - PKEIdentity sources are wrapped in `#if canImport(Security)` so the
-//     module compiles to an empty translation unit on Linux. The library is
-//     still declared on every platform so dependents resolve.
+//   - PKEIdentity and PKEHTTPClient sources are wrapped in
+//     `#if canImport(Security)` so the modules compile to empty translation
+//     units on Linux. The libraries are still declared on every platform so
+//     dependents resolve.
 //
-//   - PKECryptoTests carries the shared test-vector corpus as a processed
-//     resource via a symlink at `PKETests/Crypto/Resources/test_vectors`
-//     pointing at `../../../../shared/test_vectors`. The symlink must
-//     resolve to an existing directory; if `src/shared/test_vectors/` is
+//   - PKECryptoTests and PKEProtocolTests carry the shared test-vector
+//     corpus via symlinks under their `Resources/` directory, surfaced as
+//     `.process` resources so SwiftPM resolves the symlink targets into
+//     the test bundle. `Resources/test_vectors/README.md` is excluded
+//     because `.process` enforces basename uniqueness and we don't need
+//     the docs file in the bundle. PKEProtocolTests reuses the
+//     `context/examples/` directory (containing both `.example.json`
+//     fixtures and their `.canonical-bytes` parity targets). The symlinks
+//     must resolve to existing directories; if a target directory is
 //     missing, SwiftPM will fail resource processing with a clear
-//     "resource not found" error.
+//     "resource not found" error. Note: `.process` flattens every JSON to
+//     the bundle root and `.copy` preserves the symlink verbatim (with a
+//     relative target that no longer resolves from inside the bundle), so
+//     `Bundle.module`-based subdirectory lookups don't work. New vector
+//     runners should resolve fixture paths via `#filePath` instead.
 //
 
 import PackageDescription
@@ -33,7 +45,9 @@ let package = Package(
     products: [
         .library(name: "PKECrypto", targets: ["PKECrypto"]),
         .library(name: "PKEProtocol", targets: ["PKEProtocol"]),
-        .library(name: "PKEIdentity", targets: ["PKEIdentity"])
+        .library(name: "PKEIdentity", targets: ["PKEIdentity"]),
+        .library(name: "PKEWitness", targets: ["PKEWitness"]),
+        .library(name: "PKEHTTPClient", targets: ["PKEHTTPClient"])
     ],
     dependencies: [
         .package(
@@ -59,23 +73,56 @@ let package = Package(
             dependencies: ["PKECrypto"],
             path: "PKE/Services/Identity"
         ),
+        .target(
+            name: "PKEWitness",
+            path: "PKE/Networking/Witness"
+        ),
+        .target(
+            name: "PKEHTTPClient",
+            dependencies: ["PKEIdentity", "PKECrypto"],
+            path: "PKE/Networking/HTTPClient"
+        ),
         .testTarget(
             name: "PKECryptoTests",
             dependencies: ["PKECrypto"],
             path: "PKETests/Crypto",
+            exclude: [
+                "Resources/test_vectors/README.md"
+            ],
             resources: [
-                .process("Resources")
+                .process("Resources/test_vectors")
             ]
         ),
         .testTarget(
             name: "PKEProtocolTests",
             dependencies: ["PKEProtocol"],
-            path: "PKETests/Protocol"
+            path: "PKETests/Protocol",
+            resources: [
+                .process("Resources/examples")
+            ]
         ),
         .testTarget(
             name: "PKEIdentityTests",
-            dependencies: ["PKEIdentity"],
+            dependencies: [
+                "PKEIdentity",
+                "PKECrypto",
+                .product(name: "Crypto", package: "swift-crypto")
+            ],
             path: "PKETests/Identity"
+        ),
+        .testTarget(
+            name: "PKEWitnessTests",
+            dependencies: ["PKEWitness"],
+            path: "PKETests/Witness"
+        ),
+        .testTarget(
+            name: "PKEHTTPClientTests",
+            dependencies: [
+                "PKEHTTPClient",
+                "PKEIdentity",
+                .product(name: "Crypto", package: "swift-crypto")
+            ],
+            path: "PKETests/HTTPClient"
         )
     ]
 )

@@ -6,7 +6,7 @@
   "recipient_encryption_public_key": "recipient_test_encryption_public_key_001",
   "wrapped_snapshot_key": "wrapped_key_test_001",
   "wrapping_algorithm": "ecdhp256+aesgcm256",
-  "granted_by_signing_public_key": "owner_test_signing_public_key_001",
+  "granted_by_signing_public_key": "owner_test_signing_public_key_0011",
   "grant_timestamp": "2026-05-15T00:01:00Z",
   "grant_signature": "grant_test_signature_001"
 }

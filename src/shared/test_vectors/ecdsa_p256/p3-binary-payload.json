@@ -1,0 +1,13 @@
+{
+  "name": "p3-binary-payload",
+  "inputs": {
+    "private_key_pkcs8_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgZoH/ikosFIxleTld\nsvUoMUJU6D9XlVKtGXGTXqs0iv2hRANCAAQ521sUOfIBk6T5he0OFMjpyb07rm5L\n3EHtSr0rXklg59xEvYUQ2jWpolNhmN7+IoG96L5EmVHLwCM798Ma01l0\n-----END PRIVATE KEY-----\n",
+    "public_key_uncompressed_hex": "0439db5b1439f20193a4f985ed0e14c8e9c9bd3bae6e4bdc41ed4abd2b5e4960e7dc44bd8510da35a9a2536198defe2281bde8be449951cbc0233bf7c31ad35974",
+    "message_hex": "843b96517bcc938b2d3319685e0a544c6ed7aab8baf21b0e242b1786e8b333f27f681eea3dde58b284216ed0f0728a1a76cf799959690ff5e377625080e73c116086ddc121e7c7005bcfb92ae57418feb9a1814b261340f6297ce3deb24226f2318e58e4d026ec8b5135bcf632fbfd9e13201aa5a07413450ed150388069823b"
+  },
+  "expected": {
+    "signature_p1363_hex": "ee9c44ce20315739dde0cf15e30a2f71dd269ef960c0688d6d0315028bba3182344defd6d400c09d9c648139ef5e08396cceed4bf405a7f8ac94f3fb2ef4345c"
+  },
+  "valid": true,
+  "notes": "Deterministic ECDSA with low-s normalization for byte-stable test vectors."
+}

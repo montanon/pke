@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help install lint fmt typecheck test ci db serve clean ios-test ios-lint
+.PHONY: help install lint fmt typecheck test ci db serve clean ios-test ios-lint vectors
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -39,3 +39,11 @@ ios-test: ## Run iOS Swift tests
 
 ios-lint: ## Run SwiftLint on iOS sources
 	cd src/ios && swiftlint --config .swiftlint.yml --strict
+
+vectors: ## Regenerate shared test vectors and fail loudly on drift
+	uv run --project src/backend python src/shared/tools/generate_vectors.py
+	@git diff --quiet --exit-code src/shared/test_vectors/ || { \
+	  echo "Vector drift detected:"; \
+	  git --no-pager diff src/shared/test_vectors/; \
+	  exit 1; \
+	}

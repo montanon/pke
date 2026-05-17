@@ -1,3 +1,4 @@
+*/skills/*
 # Python
 __pycache__/
 *.py[cod]
@@ -74,3 +75,6 @@ alembic/versions/__pycache__/
 
 # Logs
 *.log
+
+# Local working files for the orchestrator workflow — source of truth is Jira.
+planning/

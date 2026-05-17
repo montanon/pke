@@ -1,0 +1,13 @@
+{
+  "name": "p1-snapshot-commit",
+  "inputs": {
+    "private_key_pkcs8_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgA0k7MWRWbGLPaKyv\n1lVDCRZfacNpn1QIbdce5GxEJAKhRANCAATLyA66CTEJE6JO7FH1+QD312GEupK9\ntUaVMtSpN20Yje554EeG+lqi+fFbuR0EMMjJuFp4+9Ul9TamUfpKeUHS\n-----END PRIVATE KEY-----\n",
+    "public_key_uncompressed_hex": "04cbc80eba09310913a24eec51f5f900f7d76184ba92bdb5469532d4a9376d188dee79e04786fa5aa2f9f15bb91d0430c8c9b85a78fbd525f536a651fa4a7941d2",
+    "message_hex": "7b226b696e64223a22736e617073686f74222c22736571223a317d"
+  },
+  "expected": {
+    "signature_p1363_hex": "da9a8bdf8c29ec68a9548bb25572623f16747bea7fa0b5856ad914a4157a816e6b2c3ea0d396e90531505507659a870a79c7d04f8901c05601e6b37f80a13a00"
+  },
+  "valid": true,
+  "notes": "Deterministic ECDSA with low-s normalization for byte-stable test vectors."
+}

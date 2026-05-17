@@ -1,0 +1,11 @@
+{
+  "name": "n1-mutated-digest",
+  "inputs": {
+    "message_hex": "616263"
+  },
+  "expected": {
+    "digest_hex": "ba7816bf8f01cfeb414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  },
+  "valid": false,
+  "notes": "Sibling positive: p2-short-abc. expected.digest_hex byte at offset 7 flipped (XOR 0x01); implementation hashing inputs.message_hex will NOT match."
+}

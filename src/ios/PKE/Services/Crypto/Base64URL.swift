@@ -1,64 +1,59 @@
+// base64url (RFC 4648 §5) without padding. Mirrors the backend
+// `pke_backend.crypto.encoding` contract: `+` and `/` are rejected, padded
+// inputs are rejected, and `length mod 4 == 1` is rejected before any decode.
+
 import Foundation
 
-public enum Base64URL {
-    public static func encode(_ data: Data) -> String {
-        let standard = data.base64EncodedString()
-        var out = ""
-        out.reserveCapacity(standard.count)
-        for scalar in standard.unicodeScalars {
-            switch scalar {
-            case "+":
-                out.append("-")
-            case "/":
-                out.append("_")
-            case "=":
-                continue
-            default:
-                out.unicodeScalars.append(scalar)
+extension PKECrypto {
+
+    public enum Base64URL {
+
+        /// Encode `data` as base64url without padding.
+        public static func encode(_ data: Data) -> String {
+            let standard = data.base64EncodedString()
+            var out = standard
+            out = out.replacingOccurrences(of: "+", with: "-")
+            out = out.replacingOccurrences(of: "/", with: "_")
+            while out.hasSuffix("=") {
+                out.removeLast()
             }
+            return out
         }
-        return out
-    }
 
-    public static func decode(_ string: String) throws -> Data {
-        try validateURLSafe(string)
-        var translated = ""
-        translated.reserveCapacity(string.count)
-        for scalar in string.unicodeScalars {
-            switch scalar {
-            case "-":
-                translated.append("+")
-            case "_":
-                translated.append("/")
-            default:
-                translated.unicodeScalars.append(scalar)
+        /// Decode an unpadded base64url string. Rejects padding, characters
+        /// outside the base64url alphabet, and lengths with `mod 4 == 1`.
+        public static func decode(_ text: String) throws -> Data {
+            if text.contains("=") {
+                throw CryptoError.encoding(reason: "padded input rejected (unpadded base64url required)")
             }
+            for scalar in text.unicodeScalars where !Self.isAllowed(scalar) {
+                throw CryptoError.encoding(reason: "character outside base64url alphabet")
+            }
+            let remainder = text.count % 4
+            if remainder == 1 {
+                throw CryptoError.encoding(reason: "invalid base64url length: \(text.count) (mod 4 == 1)")
+            }
+            var standard = text
+            standard = standard.replacingOccurrences(of: "-", with: "+")
+            standard = standard.replacingOccurrences(of: "_", with: "/")
+            if remainder == 2 {
+                standard.append("==")
+            } else if remainder == 3 {
+                standard.append("=")
+            }
+            guard let data = Data(base64Encoded: standard) else {
+                throw CryptoError.encoding(reason: "base64url decode failure")
+            }
+            return data
         }
-        let padLength = (4 - translated.count % 4) % 4
-        if padLength == 1 {
-            throw CryptoError.encoding(reason: "invalid length mod 4")
-        }
-        translated.append(String(repeating: "=", count: padLength))
-        guard let decoded = Data(base64Encoded: translated) else {
-            throw CryptoError.encoding(reason: "base64 decode failed")
-        }
-        return decoded
-    }
 
-    private static func validateURLSafe(_ string: String) throws {
-        for (offset, scalar) in string.unicodeScalars.enumerated() where !isURLSafeAlphabet(scalar) {
-            throw CryptoError.encoding(
-                reason: "invalid character at index \(offset)"
-            )
-        }
-    }
-
-    private static func isURLSafeAlphabet(_ scalar: Unicode.Scalar) -> Bool {
-        switch scalar {
-        case "A"..."Z", "a"..."z", "0"..."9", "-", "_":
-            return true
-        default:
-            return false
+        private static func isAllowed(_ scalar: Unicode.Scalar) -> Bool {
+            switch scalar {
+            case "A"..."Z", "a"..."z", "0"..."9", "-", "_":
+                return true
+            default:
+                return false
+            }
         }
     }
 }

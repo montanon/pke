@@ -1,99 +1,145 @@
+// Deterministic canonical-JSON encoder for signed payloads (HLAM-3 / HLAM-7).
+// Swift mirror of the backend `pke_backend.crypto.canonicalize` module; see
+// `context/16_canonical_encoding.md` §Canonical JSON for the locked v0.1 rules:
+//   - keys sorted by UTF-8 byte sequence at every level,
+//   - minified separators (`,` and `:`) with no whitespace,
+//   - non-ASCII characters emitted as raw UTF-8 (no `\uXXXX` escapes),
+//   - NaN / Infinity rejected,
+//   - no trailing newline,
+//   - recursion depth bounded at `MAX_DEPTH = 64`.
+
 import Foundation
 
 public enum CanonicalJSON {
-    public static func encode(_ value: JSONValue) -> Data {
-        var bytes: [UInt8] = []
-        appendValue(value, into: &bytes)
-        return Data(bytes)
+
+    public static let maxDepth = 64
+
+    public static func encode(_ value: JSONValue) throws -> Data {
+        try checkDepth(value, depth: 1)
+        var buffer = Data()
+        try encodeValue(value, into: &buffer)
+        return buffer
     }
 
-    private static func appendValue(_ value: JSONValue, into bytes: inout [UInt8]) {
+    // MARK: - Depth bound
+
+    private static func checkDepth(_ value: JSONValue, depth: Int) throws {
+        if depth > Self.maxDepth {
+            throw CryptoError.canonicalEncoding(reason: "nesting exceeds MAX_DEPTH=\(Self.maxDepth)")
+        }
+        switch value {
+        case .object(let pairs):
+            for (_, child) in pairs {
+                try Self.checkDepth(child, depth: depth + 1)
+            }
+        case .array(let items):
+            for child in items {
+                try Self.checkDepth(child, depth: depth + 1)
+            }
+        default:
+            return
+        }
+    }
+
+    // MARK: - Encoding
+
+    private static func encodeValue(_ value: JSONValue, into buffer: inout Data) throws {
         switch value {
         case .null:
-            bytes.append(contentsOf: literalNull)
+            buffer.append(contentsOf: [0x6E, 0x75, 0x6C, 0x6C])
         case .bool(let flag):
-            bytes.append(contentsOf: flag ? literalTrue : literalFalse)
-        case .integer(let int):
-            bytes.append(contentsOf: Array(String(int).utf8))
-        case .string(let str):
-            appendString(str, into: &bytes)
+            if flag {
+                buffer.append(contentsOf: [0x74, 0x72, 0x75, 0x65])
+            } else {
+                buffer.append(contentsOf: [0x66, 0x61, 0x6C, 0x73, 0x65])
+            }
+        case .int(let integer):
+            buffer.append(contentsOf: Array(String(integer).utf8))
+        case .double(let double):
+            try Self.encodeDouble(double, into: &buffer)
+        case .string(let string):
+            Self.encodeString(string, into: &buffer)
         case .array(let items):
-            appendArray(items, into: &bytes)
-        case .object(let entries):
-            appendObject(entries, into: &bytes)
+            try Self.encodeArray(items, into: &buffer)
+        case .object(let pairs):
+            try Self.encodeObject(pairs, into: &buffer)
         }
     }
 
-    private static func appendArray(_ items: [JSONValue], into bytes: inout [UInt8]) {
-        bytes.append(0x5B) // [
+    private static func encodeArray(_ items: [JSONValue], into buffer: inout Data) throws {
+        buffer.append(0x5B)
         for (index, item) in items.enumerated() {
-            if index > 0 { bytes.append(0x2C) }
-            appendValue(item, into: &bytes)
+            if index > 0 {
+                buffer.append(0x2C)
+            }
+            try Self.encodeValue(item, into: &buffer)
         }
-        bytes.append(0x5D) // ]
+        buffer.append(0x5D)
     }
 
-    private static func appendObject(_ entries: [String: JSONValue], into bytes: inout [UInt8]) {
-        bytes.append(0x7B) // {
-        let sortedKeys = entries.keys.sorted { lhs, rhs in
-            lhs.utf8.lexicographicallyPrecedes(rhs.utf8)
+    private static func encodeObject(_ pairs: [(String, JSONValue)], into buffer: inout Data) throws {
+        // Sort by UTF-8 byte sequence. Swift's `String <` operator compares by
+        // Unicode scalar order; for any pair of well-formed UTF-8 strings the
+        // scalar order equals the byte order because UTF-8 is designed to
+        // preserve code-point ordering across multi-byte sequences.
+        let sorted = pairs.sorted { lhs, rhs in
+            lhs.0 < rhs.0
         }
-        for (index, key) in sortedKeys.enumerated() {
-            if index > 0 { bytes.append(0x2C) }
-            appendString(key, into: &bytes)
-            bytes.append(0x3A) // :
-            // sortedKeys came from entries.keys, so the subscript always hits.
-            if let child = entries[key] {
-                appendValue(child, into: &bytes)
+        buffer.append(0x7B)
+        for (index, pair) in sorted.enumerated() {
+            if index > 0 {
+                buffer.append(0x2C)
+            }
+            Self.encodeString(pair.0, into: &buffer)
+            buffer.append(0x3A)
+            try Self.encodeValue(pair.1, into: &buffer)
+        }
+        buffer.append(0x7D)
+    }
+
+    private static func encodeString(_ string: String, into buffer: inout Data) {
+        buffer.append(0x22)
+        for scalar in string.unicodeScalars {
+            switch scalar.value {
+            case 0x22:
+                buffer.append(contentsOf: [0x5C, 0x22])
+            case 0x5C:
+                buffer.append(contentsOf: [0x5C, 0x5C])
+            case 0x08:
+                buffer.append(contentsOf: [0x5C, 0x62])
+            case 0x0C:
+                buffer.append(contentsOf: [0x5C, 0x66])
+            case 0x0A:
+                buffer.append(contentsOf: [0x5C, 0x6E])
+            case 0x0D:
+                buffer.append(contentsOf: [0x5C, 0x72])
+            case 0x09:
+                buffer.append(contentsOf: [0x5C, 0x74])
+            case 0x00...0x1F:
+                let hex = String(format: "%04x", scalar.value)
+                buffer.append(contentsOf: [0x5C, 0x75])
+                buffer.append(contentsOf: Array(hex.utf8))
+            default:
+                // Raw UTF-8 — Python's ensure_ascii=False parity.
+                let utf8 = String(scalar).utf8
+                buffer.append(contentsOf: utf8)
             }
         }
-        bytes.append(0x7D) // }
+        buffer.append(0x22)
     }
 
-    private static func appendString(_ str: String, into bytes: inout [UInt8]) {
-        bytes.append(0x22) // "
-        for byte in str.utf8 {
-            appendStringByte(byte, into: &bytes)
+    // MARK: - Float caveat
+    //
+    // No current fixture exercises floating-point output, and Python's
+    // `json.dumps` and Swift's `String(Double)` use different shortest-form
+    // algorithms (Python's `repr` vs. Grisu/Ryu). Strict byte-parity with the
+    // backend is only guaranteed for the int/string/bool/null/array/object
+    // subset; floats are accepted but their textual form is not contractually
+    // pinned across runtimes.
+    private static func encodeDouble(_ double: Double, into buffer: inout Data) throws {
+        if !double.isFinite {
+            throw CryptoError.canonicalEncoding(reason: "non-finite number")
         }
-        bytes.append(0x22)
+        buffer.append(contentsOf: Array(String(double).utf8))
     }
-
-    private static func appendStringByte(_ byte: UInt8, into bytes: inout [UInt8]) {
-        switch byte {
-        case 0x22:
-            bytes.append(contentsOf: [0x5C, 0x22])
-        case 0x5C:
-            bytes.append(contentsOf: [0x5C, 0x5C])
-        case 0x08:
-            bytes.append(contentsOf: [0x5C, 0x62])
-        case 0x09:
-            bytes.append(contentsOf: [0x5C, 0x74])
-        case 0x0A:
-            bytes.append(contentsOf: [0x5C, 0x6E])
-        case 0x0C:
-            bytes.append(contentsOf: [0x5C, 0x66])
-        case 0x0D:
-            bytes.append(contentsOf: [0x5C, 0x72])
-        case 0x00...0x1F:
-            appendUnicodeEscape(byte, into: &bytes)
-        default:
-            bytes.append(byte)
-        }
-    }
-
-    private static func appendUnicodeEscape(_ byte: UInt8, into bytes: inout [UInt8]) {
-        // \u00XX — only reachable for control bytes (0x00..0x1F) outside short escapes.
-        bytes.append(contentsOf: [0x5C, 0x75, 0x30, 0x30])
-        bytes.append(hexDigit(byte >> 4))
-        bytes.append(hexDigit(byte & 0x0F))
-    }
-
-    private static func hexDigit(_ nibble: UInt8) -> UInt8 {
-        // Lowercase to match Python json.dumps and ensure a single canonical form.
-        nibble < 10 ? (0x30 + nibble) : (0x61 + nibble - 10)
-    }
-
-    private static let literalNull: [UInt8] = [0x6E, 0x75, 0x6C, 0x6C]
-    private static let literalTrue: [UInt8] = [0x74, 0x72, 0x75, 0x65]
-    private static let literalFalse: [UInt8] = [0x66, 0x61, 0x6C, 0x73, 0x65]
 }

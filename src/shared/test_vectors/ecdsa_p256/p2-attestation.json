@@ -1,0 +1,13 @@
+{
+  "name": "p2-attestation",
+  "inputs": {
+    "private_key_pkcs8_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgXJHt6cIxTXRaw7B2\nhtvX8YG1Trtrmmp76f1YjU05Mx6hRANCAAQu9A4J11R0FGCO9MauMYLOM+X6k7xe\nSRRrvvcF0A6QdfquyzqR8KQqDXXHJRtiuLwTEDKYhlQdHvKTsw4I3RsX\n-----END PRIVATE KEY-----\n",
+    "public_key_uncompressed_hex": "042ef40e09d7547414608ef4c6ae3182ce33e5fa93bc5e49146bbef705d00e9075faaecb3a91f0a42a0d75c7251b62b8bc1310329886541d1ef293b30e08dd1b17",
+    "message_hex": "7b226b696e64223a226174746573746174696f6e222c22736571223a34322c2268617368223a22616263227d"
+  },
+  "expected": {
+    "signature_p1363_hex": "cae3547262c59906b47d57267d79d661b4997fc375f3b6fa0e49da5cd01e6c0955dabefa2859f44040d2b216ac2a78e30894798722e172115b037d7738b65a7e"
+  },
+  "valid": true,
+  "notes": "Deterministic ECDSA with low-s normalization for byte-stable test vectors."
+}

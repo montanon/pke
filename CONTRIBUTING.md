@@ -14,6 +14,28 @@ See the [README](./README.md) for prerequisites and quick start.
 4. Run `make db` to start the local PostgreSQL database.
 5. Run `make ci` to verify everything works.
 
+### iOS toolchain (optional, only if you touch `src/ios`)
+
+`make ios-test` and `make ios-lint` assume `swift` and `swiftlint` are on `PATH`.
+
+**macOS**
+
+- Swift: install Xcode (App Store) or the Command Line Tools (`xcode-select --install`).
+- SwiftLint: `brew install swiftlint`.
+
+**Linux**
+
+- Swift: Apple ships official Linux toolchains. The simplest path is
+  [`swiftly`](https://www.swift.org/install/linux/) (Apple's `rustup`-style
+  installer); alternatively use the signed APT repo or a release tarball
+  from [swift.org/install/linux](https://www.swift.org/install/linux).
+  `PKECrypto`, `PKEProtocol`, and `PKEWitness` build on Linux;
+  `PKEIdentity` is `#if canImport(Security)`-gated and compiles to an empty
+  translation unit (expected — Keychain is Apple-only).
+- SwiftLint: install via [Mint](https://github.com/yonaskolb/Mint) or build
+  from source (`git clone https://github.com/realm/SwiftLint && swift build -c release`).
+  Not strictly required for local work — the macOS CI job enforces lint on every PR.
+
 ## Code style
 
 ### Python
