@@ -7,6 +7,10 @@ schema. Keep new model modules listed here.
 
 from __future__ import annotations
 
+from pke_backend.models.attestation import (
+    WITNESS_ATTESTATION_VERSION,
+    WitnessAttestation,
+)
 from pke_backend.models.ledger import LEDGER_VERSION, EventType, LedgerEntry
 from pke_backend.models.snapshot import (
     CIPHERTEXT_HASH_BYTES,
@@ -23,4 +27,6 @@ __all__ = [
     "SESSION_NONCE_BYTES",
     "SNAPSHOT_VERSION",
     "Snapshot",
+    "WITNESS_ATTESTATION_VERSION",
+    "WitnessAttestation",
 ]
