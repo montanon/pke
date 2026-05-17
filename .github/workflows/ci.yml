@@ -57,6 +57,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --all-extras --all-packages
+      - run: make vectors
       - run: uv run pytest --tb=short -q
         env:
           PKE_DATABASE_URL: postgresql+asyncpg://pke:pke@localhost:5432/pke_test  # pragma: allowlist secret
