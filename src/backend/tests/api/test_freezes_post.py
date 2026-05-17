@@ -1,11 +1,22 @@
-"""HTTP integration tests for ``POST /freezes`` (HLAM-79, AC #4–7 + edges).
+"""HTTP integration tests for ``POST /freezes`` (HLAM-79 + HLAM-82).
 
-Covers:
+Originally HLAM-79's ACs #4–7. HLAM-82 (Report + Freeze test suite) keeps
+the same coverage and adds:
 
-* AC #4 happy path including snapshot `frozen` state via ``is_snapshot_frozen``
+* AC #7 (HLAM-82 numbering): primitive ``is_snapshot_frozen()`` returns
+  ``True`` after a successful freeze — the directly-testable surface of
+  the cross-feature "POST /key-grants is rejected with 409 snapshot_frozen"
+  guarantee.
+* AC #7 (HLAM-82, HTTP-level): the full POST /key-grants → 409
+  snapshot_frozen path is marked ``@pytest.mark.skip(reason="awaits HLAM-74")``
+  so the gap is visible until HLAM-74 lands the POST endpoint.
+
+Covers (existing):
+
+* AC #4 happy path including snapshot ``frozen`` state via ``is_snapshot_frozen``
 * AC #5 missing report — also covers the non-UUID ``triggered_by`` variant
 * AC #6 duplicate freeze (same snapshot, second valid report)
-* AC #7 invalid signature
+* AC #7 (HLAM-79 numbering) invalid signature
 * Edge: concurrent freezes serialize (one 201, one 409)
 * Edge: report after a freeze stays accepted
 """
@@ -320,3 +331,54 @@ async def test_report_after_freeze_still_accepted(
         EventType.FROZEN,
         EventType.REPORTED,
     ]
+
+
+# --- HLAM-82 AC #7 — primitive: frozen state observable -------------------
+
+
+async def test_is_snapshot_frozen_true_after_freeze(
+    client: httpx.AsyncClient,
+    session: AsyncSession,
+    seed_snapshot_id: uuid.UUID,
+    reporter_keypair: ec.EllipticCurvePrivateKey,
+    freezer_keypair: ec.EllipticCurvePrivateKey,
+) -> None:
+    """HLAM-82 AC #7 (primitive path).
+
+    The HTTP-level form — "POST /key-grants after freeze returns 409
+    snapshot_frozen" — depends on HLAM-74's POST /key-grants implementation
+    landing. Until then, the directly-testable surface is the primitive
+    that the future endpoint will call.
+    """
+    assert await is_snapshot_frozen(session, seed_snapshot_id) is False
+
+    report_id = await _post_report(client, seed_snapshot_id, reporter_keypair)
+    freeze_payload = build_signed_freeze(
+        snapshot_id=seed_snapshot_id,
+        triggered_by=str(report_id),
+        signer=freezer_keypair,
+    )
+    freeze_response = await client.post("/freezes", json=freeze_payload)
+    assert freeze_response.status_code == 201
+
+    assert await is_snapshot_frozen(session, seed_snapshot_id) is True
+
+
+# --- HLAM-82 AC #7 — HTTP-level, blocked on HLAM-74 ----------------------
+
+
+@pytest.mark.skip(reason="POST /key-grants is HLAM-74; awaits that ticket landing")
+async def test_post_key_grants_rejected_for_frozen_snapshot() -> None:
+    """HLAM-82 AC #7 (HTTP path).
+
+    Once HLAM-74 lands the POST /key-grants endpoint, this test should:
+
+    * Seed a snapshot + freeze it via POST /reports → POST /freezes.
+    * POST /key-grants for the frozen snapshot.
+    * Assert 409 ``snapshot_frozen``.
+
+    The freeze-blocks-grants primitive is already covered by
+    :func:`test_is_snapshot_frozen_true_after_freeze`; this stub keeps the
+    AC visible in test output until the HTTP path can be exercised.
+    """
+    raise AssertionError("should not run — see skip reason")

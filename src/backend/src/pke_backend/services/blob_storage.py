@@ -11,6 +11,11 @@ file I/O. This consumes default-executor threads on the event loop's default
 thread pool (``min(32, os.cpu_count() + 4)``); under heavy concurrent upload
 load that pool can become the bottleneck before disk does. Documented here as
 a known limit that motivates the S3 migration path.
+
+Module-level provider (``get_blob_store``) is patterned after
+:func:`pke_backend.db.get_engine` — lazy singleton built from
+:class:`pke_backend.config.Settings.BLOB_ROOT`, reset by tests via
+:func:`reset_blob_store_cache`.
 """
 
 from __future__ import annotations
@@ -27,6 +32,8 @@ from pathlib import Path
 from typing import Final, Protocol
 from uuid import UUID
 
+from pke_backend.config import get_settings
+
 __all__ = [
     "BLOB_FILENAME",
     "BLOB_TMP_SUFFIX",
@@ -37,6 +44,8 @@ __all__ = [
     "BlobStoreError",
     "BlobStoreIOError",
     "FilesystemBlobStore",
+    "get_blob_store",
+    "reset_blob_store_cache",
 ]
 
 BLOB_FILENAME: Final[str] = "blob.bin"
@@ -162,6 +171,25 @@ class FilesystemBlobStore:
         self._validate_id(snapshot_id)
         return await asyncio.to_thread(self._blob_path(snapshot_id).is_file)
 
+    async def size(self, snapshot_id: UUID) -> int:
+        """Return the on-disk size in bytes of the blob for ``snapshot_id``.
+
+        Raises ``BlobNotFoundError`` if the file does not exist. Used by the
+        HLAM-65 GET /blob endpoint to populate ``Content-Length`` without
+        consuming the stream.
+        """
+        self._validate_id(snapshot_id)
+        blob_path = self._blob_path(snapshot_id)
+        try:
+            st = await asyncio.to_thread(os.stat, blob_path)
+        except FileNotFoundError as exc:
+            raise BlobNotFoundError(reason=f"no blob for {snapshot_id}") from exc
+        except OSError as exc:
+            raise BlobStoreIOError(
+                reason=f"failed to stat blob for {snapshot_id}: errno={exc.errno}",
+            ) from exc
+        return int(st.st_size)
+
     async def put(
         self,
         snapshot_id: UUID,
@@ -247,6 +275,36 @@ class FilesystemBlobStore:
         self._validate_id(snapshot_id)
         return self._read_stream(snapshot_id, self._blob_path(snapshot_id))
 
+    def get_range(
+        self,
+        snapshot_id: UUID,
+        *,
+        offset: int = 0,
+        length: int | None = None,
+    ) -> AsyncIterator[bytes]:
+        """Stream a contiguous slice of the blob.
+
+        ``offset`` is byte-position from the start; ``length`` is the number
+        of bytes to yield (``None`` = read to EOF). Out-of-range parameters
+        (negative offset, negative length) raise ``ValueError`` — the
+        endpoint pre-validates the Range header so a value reaching here
+        already passed range-syntax checks.
+
+        ``length=0`` yields a single empty iterator (a valid Range response
+        for a zero-byte slice).
+        """
+        self._validate_id(snapshot_id)
+        if offset < 0:
+            raise ValueError(f"offset must be >= 0, got {offset}")
+        if length is not None and length < 0:
+            raise ValueError(f"length must be >= 0 when set, got {length}")
+        return self._read_range_stream(
+            snapshot_id,
+            self._blob_path(snapshot_id),
+            offset=offset,
+            length=length,
+        )
+
     @staticmethod
     async def _fsync_dir(directory: Path) -> None:
         dir_fd = await asyncio.to_thread(os.open, directory, os.O_RDONLY)
@@ -283,3 +341,67 @@ class FilesystemBlobStore:
                 yield chunk
         finally:
             await asyncio.to_thread(os.close, fd)
+
+    @staticmethod
+    async def _read_range_stream(
+        snapshot_id: UUID,
+        blob_path: Path,
+        *,
+        offset: int,
+        length: int | None,
+    ) -> AsyncIterator[bytes]:
+        try:
+            fd = await asyncio.to_thread(os.open, blob_path, os.O_RDONLY)
+        except FileNotFoundError as exc:
+            raise BlobNotFoundError(reason=f"no blob for {snapshot_id}") from exc
+        except OSError as exc:
+            raise BlobStoreIOError(
+                reason=f"failed to open blob for {snapshot_id}: errno={exc.errno}",
+            ) from exc
+        try:
+            if offset > 0:
+                await asyncio.to_thread(os.lseek, fd, offset, os.SEEK_SET)
+            remaining = length if length is not None else -1
+            if remaining == 0:
+                return
+            while True:
+                to_read = _CHUNK_SIZE if remaining < 0 else min(_CHUNK_SIZE, remaining)
+                if to_read == 0:
+                    return
+                chunk = await asyncio.to_thread(os.read, fd, to_read)
+                if not chunk:
+                    return
+                yield chunk
+                if remaining > 0:
+                    remaining -= len(chunk)
+                    if remaining == 0:
+                        return
+        finally:
+            await asyncio.to_thread(os.close, fd)
+
+
+_blob_store: FilesystemBlobStore | None = None
+
+
+def get_blob_store() -> FilesystemBlobStore:
+    """Lazy module-level provider patterned after :func:`pke_backend.db.get_engine`.
+
+    Reads ``Settings.BLOB_ROOT`` on first call, instantiates a
+    :class:`FilesystemBlobStore`, and caches it. FastAPI's ``Depends`` can
+    use this function directly because it has no parameters.
+    """
+    global _blob_store
+    if _blob_store is None:
+        _blob_store = FilesystemBlobStore(get_settings().BLOB_ROOT)
+    return _blob_store
+
+
+def reset_blob_store_cache() -> None:
+    """Clear the cached :class:`FilesystemBlobStore`.
+
+    Tests that point ``Settings.BLOB_ROOT`` at a fresh temp directory must
+    call this so the next :func:`get_blob_store` invocation rebuilds the
+    singleton against the new root.
+    """
+    global _blob_store
+    _blob_store = None

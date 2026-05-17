@@ -1,15 +1,20 @@
-"""HTTP integration tests for ``POST /reports`` (HLAM-79, AC #1–3 + edges).
+"""HTTP integration tests for ``POST /reports`` (HLAM-79 + HLAM-82).
+
+Originally HLAM-79 (ACs #1–3, signature / payload rejection paths,
+owner-self-report, double-report). HLAM-82 adds **AC #10**
+(``test_five_concurrent_reports_produce_linear_chain``) — verifying the
+advisory-lock-serialised ledger appends produce a strictly linear chain
+under five concurrent ``asyncio.gather`` writers.
 
 The fixture ``client`` already wires the ASGI transport against
 ``pke_backend.main.app``; ``seed_snapshot_id`` provides a snapshot row whose
-owner public key is :func:`owner_keypair`'s public form. Tests cover the
-acceptance criteria, signature/payload rejection paths, and the two edge
-cases called out in the Story (owner-self-report and double-report from same
-reporter).
+owner public key is :func:`owner_keypair`'s public form.
 """
 
 from __future__ import annotations
 
+import asyncio
+import itertools
 import uuid
 
 import httpx
@@ -288,3 +293,47 @@ def test_report_service_log_format_excludes_secret_fields() -> None:
     assert "report_signature" not in log_block
     assert "snapshot_id" in log_block
     assert "reason_category" in log_block
+
+
+# --- AC #10 — five concurrent reports against the same snapshot ----------
+
+
+async def test_five_concurrent_reports_produce_linear_chain(
+    client: httpx.AsyncClient,
+    session: AsyncSession,
+    seed_snapshot_id: uuid.UUID,
+) -> None:
+    """HLAM-82 AC #10: five concurrent POST /reports → exactly 5 ledger entries
+    forming a strictly linear hash chain.
+
+    The advisory-lock serialisation in ``services.ledger.append_entry`` is
+    what guarantees this; the test pins the behaviour at the HTTP boundary
+    so a regression in the locking primitive surfaces immediately.
+    """
+    keypairs = [ec.generate_private_key(ec.SECP256R1()) for _ in range(5)]
+    payloads = [build_signed_report(snapshot_id=seed_snapshot_id, signer=keypair) for keypair in keypairs]
+
+    responses = await asyncio.gather(
+        *(client.post("/reports", json=p) for p in payloads),
+        return_exceptions=False,
+    )
+
+    # All 5 must return 201 with distinct report_ids + ledger_entry_ids.
+    statuses = sorted(r.status_code for r in responses)
+    assert statuses == [201, 201, 201, 201, 201], [r.text for r in responses]
+
+    bodies = [r.json() for r in responses]
+    report_ids = {b["report_id"] for b in bodies}
+    ledger_ids = {b["ledger_entry_id"] for b in bodies}
+    assert len(report_ids) == 5
+    assert len(ledger_ids) == 5
+
+    # DB has exactly 5 reports + 5 REPORTED ledger entries, chain linear.
+    reports = (await session.execute(select(Report))).scalars().all()
+    assert len(reports) == 5
+
+    entries = (await session.execute(select(LedgerEntry).order_by(LedgerEntry.id))).scalars().all()
+    assert len(entries) == 5
+    assert all(e.event_type is EventType.REPORTED for e in entries)
+    for prev, curr in itertools.pairwise(entries):
+        assert curr.previous_entry_hash == prev.entry_hash
