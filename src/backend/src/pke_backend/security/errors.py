@@ -26,6 +26,26 @@ class UnauthenticatedError(Exception):
         self.message = message
 
 
+class InvalidCredentialsError(Exception):
+    """Raised by ``POST /v1/auth/login`` on unknown user OR wrong password.
+
+    Same exception, same response body, comparable wall-time → no
+    username enumeration via the response.
+    """
+
+    def __init__(self, message: str = "Invalid credentials.") -> None:
+        super().__init__(message)
+        self.message = message
+
+
+class DuplicateUsernameError(Exception):
+    """Raised by ``POST /v1/auth/register`` when the username is taken."""
+
+    def __init__(self, message: str = "Username already taken.") -> None:
+        super().__init__(message)
+        self.message = message
+
+
 async def unauthenticated_handler(
     request: Request,
     exc: Exception,
@@ -34,4 +54,26 @@ async def unauthenticated_handler(
     return JSONResponse(
         status_code=401,
         content={"error": {"code": "unauthenticated", "message": message}},
+    )
+
+
+async def invalid_credentials_handler(
+    request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    message = exc.message if isinstance(exc, InvalidCredentialsError) else "Invalid credentials."
+    return JSONResponse(
+        status_code=401,
+        content={"error": {"code": "invalid_credentials", "message": message}},
+    )
+
+
+async def duplicate_username_handler(
+    request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    message = exc.message if isinstance(exc, DuplicateUsernameError) else "Username already taken."
+    return JSONResponse(
+        status_code=409,
+        content={"error": {"code": "duplicate_username", "message": message}},
     )
