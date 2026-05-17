@@ -14,10 +14,15 @@
 //     module compiles to an empty translation unit on Linux. The library is
 //     still declared on every platform so dependents resolve.
 //
-//   - PKECryptoTests carries the shared test-vector corpus as a processed
-//     resource via a symlink at `PKETests/Crypto/Resources/test_vectors`
-//     pointing at `../../../../shared/test_vectors`. The symlink must
-//     resolve to an existing directory; if `src/shared/test_vectors/` is
+//   - PKECryptoTests and PKEProtocolTests carry the shared test-vector
+//     corpus via symlinks under their `Resources/` directory, surfaced as
+//     `.process` resources so SwiftPM resolves the symlink targets into
+//     the test bundle. `Resources/test_vectors/README.md` is excluded
+//     because `.process` enforces basename uniqueness and we don't need
+//     the docs file in the bundle. PKEProtocolTests reuses the
+//     `context/examples/` directory (containing both `.example.json`
+//     fixtures and their `.canonical-bytes` parity targets). The symlinks
+//     must resolve to existing directories; if a target directory is
 //     missing, SwiftPM will fail resource processing with a clear
 //     "resource not found" error.
 //
@@ -68,14 +73,20 @@ let package = Package(
             name: "PKECryptoTests",
             dependencies: ["PKECrypto"],
             path: "PKETests/Crypto",
+            exclude: [
+                "Resources/test_vectors/README.md"
+            ],
             resources: [
-                .process("Resources")
+                .process("Resources/test_vectors")
             ]
         ),
         .testTarget(
             name: "PKEProtocolTests",
             dependencies: ["PKEProtocol"],
-            path: "PKETests/Protocol"
+            path: "PKETests/Protocol",
+            resources: [
+                .process("Resources/examples")
+            ]
         ),
         .testTarget(
             name: "PKEIdentityTests",
