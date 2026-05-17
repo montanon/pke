@@ -83,7 +83,7 @@ public enum PKENetworkError: Error, Equatable, Sendable {
     /// `.internalServerError` — the design choice is deliberate: the
     /// client treats anything it cannot classify as an opaque server-side
     /// fault, never as a malformed payload, so retry policies stay correct.
-    public static func from(backendError envelope: BackendErrorEnvelope) -> PKENetworkError {
+    public static func from(backendError envelope: BackendErrorEnvelope) -> Self {
         switch envelope.error.code {
         case "malformed_payload":
             return .malformedPayload(detail: envelope.error.detail ?? "")
