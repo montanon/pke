@@ -1,8 +1,12 @@
-"""``GET /snapshots/{snapshot_id}/attestations`` endpoint (HLAM-70).
+"""``GET`` + ``POST /snapshots/{snapshot_id}/attestations`` endpoints.
 
-Returns the list of witness attestations recorded for ``snapshot_id``,
-ordered by creation time ascending, with a stable ledger-derived ETag for
-recipient caches.
+* HLAM-70 — read: returns the list of witness attestations recorded for
+  ``snapshot_id``, ordered by creation time ascending, with a stable
+  ledger-derived ETag for recipient caches.
+* HLAM-141 — write: capturer-side batch upload of witness attestations.
+  Returns a per-item ``{accepted, rejected}`` envelope; the endpoint always
+  returns 201 (the response itself carries per-item outcome). Domain rules
+  live in :func:`pke_backend.services.attestations.create_attestations_batch`.
 
 Path is on the snapshots resource per the Story; the module lives next to
 its sibling attestation surfaces so the witness-attestation contract stays
@@ -21,10 +25,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pke_backend.api.errors import HTTPError
 from pke_backend.db import get_session
 from pke_backend.schemas.attestation import (
+    AttestationBatchRequest,
+    AttestationBatchResponse,
     WitnessAttestationListResponse,
     WitnessAttestationOut,
 )
-from pke_backend.services.attestations import list_attestations
+from pke_backend.security.dependencies import require_user
+from pke_backend.services.attestations import (
+    create_attestations_batch,
+    list_attestations,
+)
 from pke_backend.services.snapshots import get_snapshot_or_404
 
 __all__ = ["router"]
@@ -76,3 +86,32 @@ async def get_snapshot_attestations(
             for row, ledger_hash in zip(rows, ledger_hashes, strict=True)
         ],
     )
+
+
+@router.post(
+    "/snapshots/{snapshot_id}/attestations",
+    status_code=201,
+    response_model=AttestationBatchResponse,
+    dependencies=[Depends(require_user)],
+    responses={
+        401: {"description": "unauthenticated"},
+        404: {"description": "snapshot_not_found"},
+        422: {"description": "invalid_payload"},
+    },
+)
+async def post_snapshot_attestations(
+    snapshot_id: str,
+    body: AttestationBatchRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> AttestationBatchResponse:
+    """Capturer-side batch upload — per-item verify + dedup + ledger anchor.
+
+    The 50-item cap is enforced at the Pydantic layer
+    (``AttestationBatchRequest.attestations`` has ``max_length=50``); an
+    over-cap upload is rejected with 422 ``invalid_payload`` before any
+    signature work happens. Per-item rejection reasons round-trip in the
+    response envelope so clients can retry surgically rather than
+    re-uploading the entire batch.
+    """
+    snapshot_uuid = _parse_snapshot_uuid(snapshot_id)
+    return await create_attestations_batch(session, snapshot_uuid, body.attestations)
