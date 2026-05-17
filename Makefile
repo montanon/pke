@@ -20,7 +20,7 @@ typecheck: ## Run type checker
 	uv run mypy src/backend/src
 
 test: ## Run tests
-	uv run pytest --tb=short -q
+	@uv run pytest --tb=short -q; rc=$$?; [ $$rc -eq 5 ] || exit $$rc
 
 ci: lint typecheck test ## Run full CI checks locally
 

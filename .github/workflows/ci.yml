@@ -57,7 +57,14 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --dev --all-packages
-      - run: uv run pytest --tb=short -q
+      # Tolerate exit code 5 (no tests collected) during the scaffolding phase.
+      # Remove the wrapper once real tests land.
+      - name: Run pytest
+        run: |
+          rc=0
+          uv run pytest --tb=short -q || rc=$?
+          [ $rc -eq 5 ] && exit 0
+          exit $rc
         env:
           PKE_DATABASE_URL: postgresql+asyncpg://pke:pke@localhost:5432/pke_test  # pragma: allowlist secret
 
