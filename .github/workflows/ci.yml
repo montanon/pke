@@ -19,7 +19,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - run: uv sync --dev --all-packages
+      - run: uv sync --all-extras --all-packages
       - run: uv run ruff check src/backend
       - run: uv run ruff format --check src/backend
 
@@ -31,7 +31,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - run: uv sync --dev --all-packages
+      - run: uv sync --all-extras --all-packages
       - run: uv run mypy src/backend/src
 
   test:
@@ -56,7 +56,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - run: uv sync --dev --all-packages
+      - run: uv sync --all-extras --all-packages
       - run: uv run pytest --tb=short -q
         env:
           PKE_DATABASE_URL: postgresql+asyncpg://pke:pke@localhost:5432/pke_test  # pragma: allowlist secret
