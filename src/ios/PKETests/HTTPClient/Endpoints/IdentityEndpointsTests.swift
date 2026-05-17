@@ -35,11 +35,9 @@ final class IdentityEndpointsTests: XCTestCase {
     func testRegisterIdentitySendsCorrectRequestAndParsesResponse() async throws {
         let baseURL = makeBaseURL()
         let endpoint = baseURL.appendingPathComponent("v1/identities")
-
         let signingKey = P256.Signing.PrivateKey().publicKey
         let encryptionKey = P256.KeyAgreement.PrivateKey().publicKey
         let displayName = "Alice's iPhone"
-
         let expected = makeIdentityFixture(
             signingPublicKey: signingKey.rawRepresentation,
             encryptionPublicKey: encryptionKey.rawRepresentation,
@@ -47,39 +45,13 @@ final class IdentityEndpointsTests: XCTestCase {
         )
 
         MockURLProtocol.handler = { request in
-            XCTAssertEqual(request.url, endpoint)
-            XCTAssertEqual(request.httpMethod, "POST")
-            XCTAssertEqual(
-                request.value(forHTTPHeaderField: "Content-Type"),
-                "application/json; charset=utf-8"
+            Self.assertRegisterRequest(
+                request,
+                endpoint: endpoint,
+                signingKey: signingKey,
+                encryptionKey: encryptionKey,
+                displayName: displayName
             )
-
-            // MockURLProtocol receives `httpBodyStream` instead of `httpBody`
-            // for streamed bodies; URLSession converts a small Data body to a
-            // stream under the hood. Read whichever channel carries the bytes.
-            let body = Self.requestBody(request)
-            XCTAssertNotNil(body)
-            if let body, let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
-                XCTAssertEqual(Set(object.keys), [
-                    "signing_public_key",
-                    "encryption_public_key",
-                    "display_name"
-                ])
-                XCTAssertEqual(object["display_name"] as? String, displayName)
-                let signingEncoded = object["signing_public_key"] as? String
-                XCTAssertEqual(
-                    signingEncoded,
-                    PKECrypto.Base64URL.encode(signingKey.rawRepresentation)
-                )
-                let encryptionEncoded = object["encryption_public_key"] as? String
-                XCTAssertEqual(
-                    encryptionEncoded,
-                    PKECrypto.Base64URL.encode(encryptionKey.rawRepresentation)
-                )
-            } else {
-                XCTFail("request body was not parseable JSON")
-            }
-
             return Self.jsonResponse(for: endpoint, status: 200, identity: expected)
         }
 
@@ -91,6 +63,44 @@ final class IdentityEndpointsTests: XCTestCase {
         )
 
         XCTAssertEqual(observed, expected)
+    }
+
+    /// Verifies the URL, method, Content-Type, and canonical JSON body of
+    /// the outbound `registerIdentity` request. Extracted from
+    /// `testRegisterIdentitySendsCorrectRequestAndParsesResponse` to keep
+    /// the test body under SwiftLint's `function_body_length` ceiling.
+    private static func assertRegisterRequest(
+        _ request: URLRequest,
+        endpoint: URL,
+        signingKey: P256.Signing.PublicKey,
+        encryptionKey: P256.KeyAgreement.PublicKey,
+        displayName: String
+    ) {
+        XCTAssertEqual(request.url, endpoint)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(
+            request.value(forHTTPHeaderField: "Content-Type"),
+            "application/json; charset=utf-8"
+        )
+        let body = requestBody(request)
+        XCTAssertNotNil(body)
+        guard let body, let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
+            XCTFail("request body was not parseable JSON")
+            return
+        }
+        XCTAssertEqual(
+            Set(object.keys),
+            ["signing_public_key", "encryption_public_key", "display_name"]
+        )
+        XCTAssertEqual(object["display_name"] as? String, displayName)
+        XCTAssertEqual(
+            object["signing_public_key"] as? String,
+            PKECrypto.Base64URL.encode(signingKey.rawRepresentation)
+        )
+        XCTAssertEqual(
+            object["encryption_public_key"] as? String,
+            PKECrypto.Base64URL.encode(encryptionKey.rawRepresentation)
+        )
     }
 
     // MARK: AC #2 — fetch by id parses 200 response
