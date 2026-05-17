@@ -52,6 +52,22 @@ final class SnapshotDecryptionServiceVectorTests: XCTestCase {
     // MARK: - Per-vector runners
 
     private func runEcdhVector(_ vector: EcdhVector) throws {
+        let materials = try resolveEcdhMaterials(vector)
+        if vector.valid {
+            try assertEcdhVectorRoundTrips(vector, materials: materials)
+        } else {
+            assertEcdhVectorRejected(vector, materials: materials)
+        }
+    }
+
+    private struct EcdhMaterials {
+        let recipientPriv: P256.KeyAgreement.PrivateKey
+        let senderPriv: P256.KeyAgreement.PrivateKey
+        let grant: KeyGrant
+        let expectedSnapshotKey: Data
+    }
+
+    private func resolveEcdhMaterials(_ vector: EcdhVector) throws -> EcdhMaterials {
         let recipientPriv = try P256.KeyAgreement.PrivateKey(
             pemRepresentation: vector.inputs.recipientPrivateKeyPkcs8Pem
         )
@@ -73,39 +89,61 @@ final class SnapshotDecryptionServiceVectorTests: XCTestCase {
             grantTimestamp: ISO8601UTCDate(Date(timeIntervalSince1970: 1_700_000_000)),
             grantSignature: Data(repeating: 0xFE, count: 64)
         )
+        return EcdhMaterials(
+            recipientPriv: recipientPriv,
+            senderPriv: senderPriv,
+            grant: grant,
+            expectedSnapshotKey: expectedSnapshotKey
+        )
+    }
 
-        let service = SnapshotDecryptionService(unwrap: { grant, ownerPub in
+    private func makeService(
+        forVector vector: EcdhVector,
+        recipient: P256.KeyAgreement.PrivateKey
+    ) -> SnapshotDecryptionService {
+        SnapshotDecryptionService { grant, ownerPub in
             try KeyWrap.unwrap(
                 grant.wrappedSnapshotKey,
-                recipientPrivate: recipientPriv,
+                recipientPrivate: recipient,
                 ownerPublic: ownerPub,
                 snapshotId: grant.snapshotId
             )
-        })
-        let ownerPub = AgreementPublicKey(senderPriv.publicKey)
+        }
+    }
 
-        if vector.valid {
-            let recovered = try service.unwrap(
-                grant: grant,
-                ownerAgreementPublicKey: ownerPub
-            )
-            let recoveredBytes: Data = recovered.withUnsafeBytes { buffer in
-                Data(buffer)
-            }
-            XCTAssertEqual(
-                recoveredBytes,
-                expectedSnapshotKey,
-                "vector \(vector.name): snapshot key mismatch"
-            )
-        } else {
-            XCTAssertThrowsError(
-                try service.unwrap(grant: grant, ownerAgreementPublicKey: ownerPub),
-                "vector \(vector.name): expected unwrap to throw"
-            ) { error in
-                guard case DecryptionError.unwrapFailed = error else {
-                    XCTFail("vector \(vector.name): expected unwrapFailed, got \(error)")
-                    return
-                }
+    private func assertEcdhVectorRoundTrips(
+        _ vector: EcdhVector,
+        materials: EcdhMaterials
+    ) throws {
+        let service = makeService(forVector: vector, recipient: materials.recipientPriv)
+        let ownerPub = AgreementPublicKey(materials.senderPriv.publicKey)
+        let recovered = try service.unwrap(
+            grant: materials.grant,
+            ownerAgreementPublicKey: ownerPub
+        )
+        let recoveredBytes: Data = recovered.withUnsafeBytes { buffer in
+            Data(buffer)
+        }
+        XCTAssertEqual(
+            recoveredBytes,
+            materials.expectedSnapshotKey,
+            "vector \(vector.name): snapshot key mismatch"
+        )
+    }
+
+    private func assertEcdhVectorRejected(
+        _ vector: EcdhVector,
+        materials: EcdhMaterials
+    ) {
+        let service = makeService(forVector: vector, recipient: materials.recipientPriv)
+        let ownerPub = AgreementPublicKey(materials.senderPriv.publicKey)
+        XCTAssertThrowsError(
+            try service.unwrap(grant: materials.grant, ownerAgreementPublicKey: ownerPub),
+            "vector \(vector.name): expected unwrap to throw"
+        ) { error in
+            guard case DecryptionError.unwrapFailed = error else {
+                XCTFail("vector \(vector.name): expected unwrapFailed, got \(error)")
+                return
             }
         }
     }
@@ -123,9 +161,9 @@ final class SnapshotDecryptionServiceVectorTests: XCTestCase {
         sealed.append(expectedCiphertext)
         sealed.append(expectedTag)
 
-        let service = SnapshotDecryptionService(unwrap: { _, _ in
+        let service = SnapshotDecryptionService { _, _ in
             throw DecryptionError.unwrapFailed(reason: "unused in aes_gcm vector path")
-        })
+        }
         let snapshotKey = SymmetricKey(data: keyBytes)
 
         if vector.valid {
