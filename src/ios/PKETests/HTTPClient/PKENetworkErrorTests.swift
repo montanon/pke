@@ -16,13 +16,13 @@ final class PKENetworkErrorTests: XCTestCase {
     // MARK: AC #1 / #2 — backend code → enum mapping
 
     func testMappingForEveryKnownBackendCode() {
-        let cases: [(code: String, detail: String, expected: PKENetworkError)] = [
-            ("malformed_payload", "missing field", .malformedPayload(detail: "missing field")),
-            ("not_found", "", .notFound),
-            ("duplicate", "session_nonce reused", .duplicate(detail: "session_nonce reused")),
-            ("signature_invalid", "", .signatureInvalid),
-            ("hash_mismatch", "", .hashMismatch),
-            ("internal_server_error", "", .internalServerError)
+        let cases: [BackendMappingCase] = [
+            BackendMappingCase("malformed_payload", "missing field", .malformedPayload(detail: "missing field")),
+            BackendMappingCase("not_found", "", .notFound),
+            BackendMappingCase("duplicate", "session_nonce reused", .duplicate(detail: "session_nonce reused")),
+            BackendMappingCase("signature_invalid", "", .signatureInvalid),
+            BackendMappingCase("hash_mismatch", "", .hashMismatch),
+            BackendMappingCase("internal_server_error", "", .internalServerError)
         ]
         for sample in cases {
             let envelope = BackendErrorEnvelope(
@@ -49,20 +49,18 @@ final class PKENetworkErrorTests: XCTestCase {
     // MARK: AC #1 — JSON shape of the backend envelope is decodable as-is
 
     func testBackendEnvelopeDecodesFromExpectedJSONShape() throws {
-        // swiftlint:disable:next force_unwrapping
-        let json = """
+        let json = Data("""
         {"error":{"code":"duplicate","detail":"already submitted"}}
-        """.data(using: .utf8)!
+        """.utf8)
         let envelope = try JSONDecoder().decode(BackendErrorEnvelope.self, from: json)
         XCTAssertEqual(envelope.error.code, "duplicate")
         XCTAssertEqual(envelope.error.detail, "already submitted")
     }
 
     func testBackendEnvelopeAcceptsMissingDetail() throws {
-        // swiftlint:disable:next force_unwrapping
-        let json = """
+        let json = Data("""
         {"error":{"code":"not_found"}}
-        """.data(using: .utf8)!
+        """.utf8)
         let envelope = try JSONDecoder().decode(BackendErrorEnvelope.self, from: json)
         XCTAssertEqual(envelope.error.code, "not_found")
         XCTAssertNil(envelope.error.detail)
@@ -116,6 +114,21 @@ final class PKENetworkErrorTests: XCTestCase {
             PKENetworkError.verificationFailed(.signatureFormat(reason: "x"))
         )
         XCTAssertNotEqual(PKENetworkError.notFound, PKENetworkError.signatureInvalid)
+    }
+}
+
+/// Single-row fixture for the backend `error.code` → enum mapping table —
+/// extracted to a named struct because SwiftLint's `large_tuple` rule
+/// caps named-tuple sizes at 2.
+private struct BackendMappingCase {
+    let code: String
+    let detail: String
+    let expected: PKENetworkError
+
+    init(_ code: String, _ detail: String, _ expected: PKENetworkError) {
+        self.code = code
+        self.detail = detail
+        self.expected = expected
     }
 }
 #endif
