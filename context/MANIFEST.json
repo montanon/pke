@@ -18,7 +18,21 @@
     "13_publication_checklist.md",
     "14_security_reporting.md",
     "15_implementation_notes_public.md",
+    "16_canonical_encoding.md",
     "README.md"
+  ],
+  "example_files": [
+    "examples/snapshot_commitment.example.json",
+    "examples/witness_attestation.example.json",
+    "examples/ledger_entry.example.json",
+    "examples/key_grant.example.json",
+    "examples/verification_report.example.json",
+    "examples/report.example.json",
+    "examples/freeze.example.json"
+  ],
+  "asset_files": [
+    "assets/architecture_public.mmd",
+    "assets/custody_flow_public.mmd"
   ],
   "safety_notes": [
     "All examples use synthetic placeholder values.",

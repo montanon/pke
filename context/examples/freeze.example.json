@@ -1,0 +1,10 @@
+{
+  "type": "freeze",
+  "version": "0.1",
+  "freeze_id": "freeze_test_001",
+  "snapshot_id": "snap_test_001",
+  "triggered_by": "report_test_001",
+  "frozen_by_signing_public_key": "system_test_signing_public_key_001",
+  "freeze_timestamp": "2026-05-15T00:02:05Z",
+  "freeze_signature": "freeze_test_signature_001"
+}

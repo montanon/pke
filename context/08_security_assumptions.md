@@ -42,7 +42,16 @@ Location is a device-reported signal. The MVP does not assume GPS is impossible 
 
 ## Time assumptions
 
-Device time may be manipulated. Verification reports may distinguish capture timestamp, witness timestamp, backend receipt timestamp, and ledger timestamp.
+Device time may be manipulated. The protocol uses four timestamp types:
+
+- `capture_timestamp` — device-reported time of live capture.
+- `witness_timestamp` — device-reported time of witness attestation.
+- `entry_timestamp` — backend-assigned time of ledger entry creation.
+- `grant_timestamp` — device-reported time of key grant creation.
+
+The `entry_timestamp` is the closest to a canonical ordering timestamp because it is assigned by the backend upon receipt. However, the backend itself is only partially trusted.
+
+The MVP should use a configurable skew window (5 minutes by default) to flag suspicious discrepancies between device-reported times and backend receipt times. None of these timestamps are cryptographically bound to a trusted time source in the MVP.
 
 ## Network assumptions
 
@@ -51,6 +60,18 @@ Network transport may be observed, delayed, interrupted, or replayed. Use signed
 ## Identity assumptions
 
 Device public keys provide cryptographic continuity, not real-world identity verification.
+
+## Identity lifecycle assumptions
+
+The MVP assumes the following identity lifecycle:
+
+- Device identities are generated locally at first launch.
+- A signing keypair (P-256) and an encryption/key-agreement keypair (P-256) are created.
+- Private keys are stored in iOS Keychain. Future work may use Secure Enclave.
+- Public keys are registered with the backend identity registry.
+- The MVP does not implement key rotation or key revocation.
+- If a device key is compromised, there is no mechanism to invalidate past signatures or custody events signed with that key.
+- Future work may add key rotation (signing a new identity with the old key), key expiry, revocation lists, and organization-backed credentials.
 
 ## Revocation assumptions
 

@@ -22,6 +22,16 @@ Principles:
 - include nonces for replay protection,
 - avoid unordered maps unless canonicalized.
 
+## Event types
+
+The `event_type` field in ledger entries must be one of:
+
+- `SNAPSHOT_COMMITTED` — a new encrypted snapshot was committed to the ledger.
+- `WITNESS_ATTESTED` — a nearby witness signed an attestation for a commitment.
+- `KEY_GRANTED` — the owner wrapped a snapshot key for an authorized recipient.
+- `REPORTED` — a user reported a snapshot record at the metadata level.
+- `FROZEN` — future key grants for a snapshot were frozen.
+
 ## Snapshot Commitment
 
 ```json
@@ -68,6 +78,8 @@ A witness attestation means a witness device signed a commitment payload during 
 
 ## Ledger Entry
 
+Each custody event produces a ledger entry. The `event_type` must be one of the types listed in the Event types section above.
+
 ```json
 {
   "type": "ledger_entry",
@@ -92,10 +104,50 @@ A witness attestation means a witness device signed a commitment payload during 
   "snapshot_id": "snap_test_001",
   "recipient_encryption_public_key": "recipient_test_encryption_public_key_001",
   "wrapped_snapshot_key": "wrapped_key_test_001",
-  "wrapping_algorithm": "example_hybrid_encryption_scheme",
+  "wrapping_algorithm": "ecdhp256+aesgcm256",
   "granted_by_signing_public_key": "owner_test_signing_public_key_001",
   "grant_timestamp": "2026-05-15T00:01:00Z",
   "grant_signature": "grant_test_signature_001"
+}
+```
+
+### Wrapping algorithm guidance
+
+The MVP should use ECDH key agreement (P-256) to derive a shared secret between the owner and recipient encryption keys, then derive a wrapping key via HKDF, then wrap the per-snapshot symmetric key with AES-256-GCM using the derived wrapping key. On iOS, this maps to CryptoKit `P256.KeyAgreement` and `AES.GCM`. The `wrapping_algorithm` field should be set to `"ecdhp256+aesgcm256"` to identify this construction.
+
+## Report
+
+A report is a metadata-level action that flags a snapshot for review. It does not require backend decryption. The backend marks the snapshot as reported and creates a `REPORTED` ledger entry.
+
+```json
+{
+  "type": "report",
+  "version": "0.1",
+  "report_id": "report_test_001",
+  "snapshot_id": "snap_test_001",
+  "reason_category": "abuse_concern",
+  "reported_by_signing_public_key": "reporter_test_signing_public_key_001",
+  "report_timestamp": "2026-05-15T00:02:00Z",
+  "report_signature": "report_test_signature_001"
+}
+```
+
+The `reason_category` may be one of: `abuse_concern`, `legal_request`, `owner_request`, `other`.
+
+## Freeze
+
+A freeze restricts future key grants for a reported snapshot. It creates a `FROZEN` ledger entry. Existing custody metadata and encrypted blobs are preserved. A freeze may be triggered by a report or by an administrative action.
+
+```json
+{
+  "type": "freeze",
+  "version": "0.1",
+  "freeze_id": "freeze_test_001",
+  "snapshot_id": "snap_test_001",
+  "triggered_by": "report_test_001",
+  "frozen_by_signing_public_key": "system_test_signing_public_key_001",
+  "freeze_timestamp": "2026-05-15T00:02:05Z",
+  "freeze_signature": "freeze_test_signature_001"
 }
 ```
 
@@ -125,6 +177,23 @@ A witness attestation means a witness device signed a commitment payload during 
   ]
 }
 ```
+
+## Timestamp semantics
+
+The protocol uses the following timestamp types:
+
+- `capture_timestamp` — device-reported time of live capture. Set by the owner device.
+- `witness_timestamp` — device-reported time of witness attestation. Set by the witness device.
+- `entry_timestamp` — backend-assigned time of ledger entry creation. Set by the server upon receipt.
+- `grant_timestamp` — device-reported time of key grant creation. Set by the granting device.
+- `report_timestamp` — device-reported time of report submission. Set by the reporting device.
+- `freeze_timestamp` — time the freeze was applied. May be set by the backend or an administrative actor.
+
+The `entry_timestamp` is the closest to a canonical ordering timestamp because it is assigned by the backend upon receipt. However, the backend itself is only partially trusted.
+
+Device-reported timestamps (`capture_timestamp`, `witness_timestamp`, `grant_timestamp`) are advisory. They may be manipulated by compromised or misconfigured devices.
+
+The MVP should use a configurable skew window (5 minutes by default) to flag suspicious timestamp discrepancies between device-reported times and backend receipt times. None of these timestamps are cryptographically bound to a trusted time source in the MVP.
 
 ## Replay protection
 

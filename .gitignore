@@ -32,6 +32,10 @@ Pods/
 *.perspectivev3
 xcuserdata/
 
+# SwiftPM
+.swiftpm/
+src/ios/.build/
+
 # Secrets — NEVER commit these
 .env
 .env.*
@@ -58,6 +62,9 @@ ehthumbs.db
 *.swp
 *.swo
 *~
+
+# Claude Code — personal settings stay local
+.claude/settings.local.json
 
 # Claude logs
 .claude_logs/

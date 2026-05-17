@@ -22,16 +22,47 @@ VerificationService
 
 Use standard platform cryptographic libraries. Avoid custom cryptographic primitives.
 
-Required operations:
+#### Authenticated encryption
 
-- authenticated encryption for snapshot bundles,
-- secure hashing for ciphertext commitments,
-- digital signatures for commitments and attestations,
-- hybrid encryption or key agreement for key grants.
+Encrypt snapshot bundles with AES-256-GCM using a per-snapshot symmetric key. On iOS: `CryptoKit AES.GCM.seal()` / `AES.GCM.open()`. Per-snapshot key: 256-bit random via `SymmetricKey(size: .bits256)`.
+
+#### Hashing
+
+Hash ciphertext with SHA-256. On iOS: `CryptoKit SHA256.hash(data:)`. Used for `ciphertext_hash` in snapshot commitments and for the hash chain in ledger entries.
+
+#### Digital signatures
+
+Sign commitments and attestations with ECDSA over P-256. On iOS: `CryptoKit P256.Signing.PrivateKey`. Owner signs snapshot commitments; witnesses sign attestations; grantors sign key grants.
+
+#### Key agreement and wrapping
+
+Wrap per-snapshot keys for recipients using ECDH key agreement (P-256). On iOS: `CryptoKit P256.KeyAgreement.PrivateKey`. Derive a shared secret between owner and recipient encryption keys, use HKDF to derive a wrapping key, then wrap the snapshot key with AES-256-GCM. The HKDF `info` and `salt` parameters are implementation-defined; these must be specified consistently between iOS and backend for interoperability.
+
+#### Encoding
+
+Public keys and signatures should be encoded as base64url for JSON payloads. Use a consistent encoding (DER or raw P1363) for ECDSA signatures.
+
+#### Backend verification
+
+The backend (Python) may verify signatures using the `cryptography` library with matching P-256 / SHA-256 parameters.
 
 ### Secure storage
 
 Private keys should remain on-device. Use secure local storage appropriate to the platform. Do not commit keys, certificates, profiles, or secrets.
+
+### Identity lifecycle
+
+The device generates a `P256.Signing.PrivateKey` and a `P256.KeyAgreement.PrivateKey` at first launch. Private keys are stored in iOS Keychain (or Secure Enclave for future hardening). Public keys are registered with the backend identity registry.
+
+The MVP does not implement key rotation or key revocation. These are future-work items (see `10_roadmap.md`).
+
+### Timestamp handling
+
+All timestamps use ISO-8601 UTC format (e.g., `2026-05-15T00:00:00Z`).
+
+Device-reported timestamps (`capture_timestamp`, `witness_timestamp`, `grant_timestamp`) are advisory and may be manipulated. Backend-assigned timestamps (`entry_timestamp`) provide ordering but are not cryptographically trusted.
+
+The MVP should reject witness attestations with timestamps more than 5 minutes from backend receipt time.
 
 ### Nearby attestation
 
@@ -59,7 +90,7 @@ The backend should not store:
 
 Use:
 
-- `.env.example` instead of `.env`,
+- `.env.sample` instead of `.env`,
 - secret scanning,
 - dependency scanning,
 - synthetic test fixtures,

@@ -10,18 +10,43 @@ The folder is safe for publication only if it remains limited to public architec
 - Problem statement
 - Product principles
 - System architecture
-- Protocol overview
-- Public data model
+- Protocol overview (event types, payloads, report/freeze, timestamp semantics)
+- Public data model (snapshots, attestations, ledger, key grants, reports, freezes)
 - Threat model
 - Privacy and abuse constraints
-- Security assumptions
+- Security assumptions (including identity lifecycle and timestamp handling)
 - MVP scope
 - Roadmap
 - Demo scenarios
 - Glossary
 - Publication checklist
 - Security reporting guidance
-- Public implementation notes
+- Public implementation notes (cryptographic specifics, identity lifecycle, timestamps)
+- Canonical encoding spec (canonical JSON, ECDSA, AES-GCM, HKDF, hash chain, v0.1 versioning)
+- Synthetic JSON payload examples (`examples/`)
+- Mermaid architecture diagrams (`assets/`)
+
+## File index
+
+| File | Purpose |
+|------|---------|
+| `00_project_summary.md` | One-page project summary and core claim |
+| `01_problem_statement.md` | Problem domain and design challenge |
+| `02_product_principles.md` | 12 product principles |
+| `03_system_architecture.md` | iOS app modules, backend modules, data flow |
+| `04_protocol_overview.md` | Protocol payloads, event types, report/freeze, timestamp semantics, replay protection |
+| `05_data_model_public.md` | Public-safe data models for all entities |
+| `06_threat_model.md` | Assets, trust boundaries, threat actors, attack classes |
+| `07_privacy_and_abuse.md` | Privacy model, E2EE tradeoffs, acceptable-use boundaries |
+| `08_security_assumptions.md` | Device, crypto, backend, witness, identity lifecycle, time, network assumptions |
+| `09_mvp_scope.md` | Must-implement features and success criteria |
+| `10_roadmap.md` | Near/medium/long-term future work |
+| `11_demo_scenarios.md` | 5 fictional end-to-end demo scenarios |
+| `12_glossary.md` | Key terms and preferred language |
+| `13_publication_checklist.md` | Review checklist before publishing |
+| `14_security_reporting.md` | Security and abuse reporting procedures |
+| `15_implementation_notes_public.md` | Cryptographic specifics, identity lifecycle, timestamp handling, repo hygiene |
+| `16_canonical_encoding.md` | v0.1 canonical-encoding spec: canonical JSON, base64url, ECDSA P1363, AES-GCM, HKDF, AEAD AAD, hash chain, versioning |
 
 ## What this folder must not include
 

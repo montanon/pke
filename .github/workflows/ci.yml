@@ -19,7 +19,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - run: uv sync --dev --all-packages
+      - run: uv sync --all-extras --all-packages
       - run: uv run ruff check src/backend
       - run: uv run ruff format --check src/backend
 
@@ -31,7 +31,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - run: uv sync --dev --all-packages
+      - run: uv sync --all-extras --all-packages
       - run: uv run mypy src/backend/src
 
   test:
@@ -56,7 +56,49 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - run: uv sync --dev --all-packages
+      - run: uv sync --all-extras --all-packages
       - run: uv run pytest --tb=short -q
         env:
           PKE_DATABASE_URL: postgresql+asyncpg://pke:pke@localhost:5432/pke_test  # pragma: allowlist secret
+
+  ios-macos:
+    name: iOS Tests (macOS)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SwiftLint
+        run: brew install swiftlint
+      - name: Cache SwiftPM artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            src/ios/.build
+          key: spm-macos-${{ hashFiles('src/ios/Package.resolved') }}
+          restore-keys: |
+            spm-macos-
+      - run: make ios-lint
+      - run: make ios-test
+
+  ios-linux:
+    name: iOS Tests (Linux)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      # setup-swift@v2 installs Swift from the official release channel.
+      # On a cache miss it falls back to a clean install — documented behavior,
+      # no extra retry logic needed.
+      - name: Install Swift 5.9
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "5.9"
+      - name: Cache SwiftPM artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            src/ios/.build
+          key: spm-linux-${{ hashFiles('src/ios/Package.resolved') }}
+          restore-keys: |
+            spm-linux-
+      - run: make ios-test

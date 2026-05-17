@@ -1,0 +1,10 @@
+{
+  "type": "report",
+  "version": "0.1",
+  "report_id": "report_test_001",
+  "snapshot_id": "snap_test_001",
+  "reason_category": "abuse_concern",
+  "reported_by_signing_public_key": "reporter_test_signing_public_key_001",
+  "report_timestamp": "2026-05-15T00:02:00Z",
+  "report_signature": "report_test_signature_001"
+}
