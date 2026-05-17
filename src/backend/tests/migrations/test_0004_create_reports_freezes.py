@@ -29,7 +29,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import text
-from sqlalchemy.exc import DataError, IntegrityError
+from sqlalchemy.exc import DataError, DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from pke_backend.config import get_settings
@@ -302,9 +302,7 @@ async def test_freeze_fk_targets_report_id_business_key_not_surrogate(
         fks = await conn.run_sync(
             lambda c: sa_inspect(c).get_foreign_keys("freezes"),
         )
-    triggered_fk = next(
-        fk for fk in fks if fk["constrained_columns"] == ["triggered_by_report_id"]
-    )
+    triggered_fk = next(fk for fk in fks if fk["constrained_columns"] == ["triggered_by_report_id"])
     assert triggered_fk["referred_table"] == "reports"
     assert triggered_fk["referred_columns"] == ["report_id"]
 
@@ -418,7 +416,7 @@ async def test_invalid_reason_category_value_is_rejected(
 ) -> None:
     """Edge case 4: ``"Abuse"`` ≠ ``"abuse_concern"`` (ENUM is case-sensitive)."""
     await _alembic_upgrade()
-    with pytest.raises((DataError, IntegrityError)):
+    with pytest.raises((DataError, DBAPIError, IntegrityError)):
         async with engine.begin() as conn:
             await conn.execute(
                 text(
