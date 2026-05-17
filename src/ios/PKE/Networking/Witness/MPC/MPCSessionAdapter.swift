@@ -210,6 +210,7 @@ final class MPCSessionBridge: NSObject, @unchecked Sendable {
     ) {
         self.continuation = continuation
         self.session = session
+        super.init()
     }
 }
 
