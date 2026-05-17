@@ -9,13 +9,21 @@
 //   PKEIdentity    — Keychain-backed identity (Apple platforms only)
 //   PKEWitness     — transport-agnostic witness flow
 //   PKEHTTPClient  — backend REST transport (Apple platforms only)
+//   PKESession     — @MainActor identity-session wrapper (Apple platforms only)
+//   PKEUI          — SwiftUI screens (Settings, Limitations)
 //
 // Cross-platform notes:
 //
-//   - PKEIdentity and PKEHTTPClient sources are wrapped in
+//   - PKEIdentity, PKEHTTPClient, and PKESession sources are wrapped in
 //     `#if canImport(Security)` so the modules compile to empty translation
 //     units on Linux. The libraries are still declared on every platform so
 //     dependents resolve.
+//
+//   - PKEUI sources are wrapped in `#if canImport(SwiftUI)` (views) and
+//     `#if canImport(UIKit)` (`UIKitPasteboardWriter`); on Linux the module
+//     compiles to a small translation unit containing the pure-data types
+//     (`Limitations`, `Fingerprint`, `BundleInfo`, `SettingsViewModel`,
+//     `PasteboardWriting`, `NoopPasteboardWriter`) only.
 //
 //   - PKECryptoTests and PKEProtocolTests carry the shared test-vector
 //     corpus via symlinks under their `Resources/` directory, surfaced as
@@ -48,6 +56,7 @@ let package = Package(
         .library(name: "PKEIdentity", targets: ["PKEIdentity"]),
         .library(name: "PKEWitness", targets: ["PKEWitness"]),
         .library(name: "PKEHTTPClient", targets: ["PKEHTTPClient"]),
+        .library(name: "PKESession", targets: ["PKESession"]),
         .library(name: "PKEUI", targets: ["PKEUI"])
     ],
     dependencies: [
@@ -80,8 +89,18 @@ let package = Package(
         ),
         .target(
             name: "PKEHTTPClient",
-            dependencies: ["PKEIdentity", "PKECrypto"],
+            dependencies: ["PKEIdentity", "PKECrypto", "PKEProtocol"],
             path: "PKE/Networking/HTTPClient"
+        ),
+        .target(
+            name: "PKESession",
+            dependencies: [
+                "PKEIdentity",
+                "PKEProtocol",
+                "PKECrypto",
+                .product(name: "Crypto", package: "swift-crypto")
+            ],
+            path: "PKE/Services/Session"
         ),
         .target(
             name: "PKEUI",
@@ -126,9 +145,22 @@ let package = Package(
             dependencies: [
                 "PKEHTTPClient",
                 "PKEIdentity",
+                "PKECrypto",
+                "PKEProtocol",
                 .product(name: "Crypto", package: "swift-crypto")
             ],
             path: "PKETests/HTTPClient"
+        ),
+        .testTarget(
+            name: "PKESessionTests",
+            dependencies: [
+                "PKESession",
+                "PKEIdentity",
+                "PKEProtocol",
+                "PKECrypto",
+                .product(name: "Crypto", package: "swift-crypto")
+            ],
+            path: "PKETests/Session"
         ),
         .testTarget(
             name: "PKEUITests",
