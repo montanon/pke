@@ -1,0 +1,14 @@
+{
+  "name": "derive-keywrap-32",
+  "inputs": {
+    "secret": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+    "salt": "706b652f76302e312f6b6579777261702f73616c74",
+    "info": "706b652f76302e312f6b6579777261702f696e666f000d736e61702d746573742d30303100410460fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb67903fe1008b8bc99a41ae9e95628bc64f2f1b20c2d7e9f5177a3c294d4462299",
+    "length": 32
+  },
+  "expected": {
+    "okm": "6652fb2ed7c49f62dbefb18522ce7984d50d0cee8050de08cdde48064cc441aa"
+  },
+  "valid": true,
+  "notes": "HKDF-SHA256 with the locked keywrap salt and a length-prefixed info that pins snapshot_id and recipient_pub per HLAM-3."
+}

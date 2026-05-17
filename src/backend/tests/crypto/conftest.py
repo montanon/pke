@@ -24,9 +24,6 @@ from pke_backend.crypto import (
     hashing as hashing_mod,
 )
 from pke_backend.crypto import (
-    kdf as kdf_mod,
-)
-from pke_backend.crypto import (
     signatures as signatures_mod,
 )
 from pke_backend.crypto.primitives import aead as aead_mod
@@ -64,7 +61,6 @@ def helper_stub_calls() -> list[StubCall]:
         ("hashing.hash_chain", hashing_mod.hash_chain, (b"a", b"b")),
         ("signatures.sign_payload", signatures_mod.sign_payload, (b"x", object())),
         ("signatures.verify_payload", signatures_mod.verify_payload, (b"x", b"y", object())),
-        ("kdf.hkdf_sha256", kdf_mod.hkdf_sha256, (b"i", b"s", b"info", 32)),
     ]
 
 

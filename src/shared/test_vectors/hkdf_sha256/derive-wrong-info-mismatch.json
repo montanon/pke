@@ -1,0 +1,16 @@
+{
+  "name": "derive-wrong-info-mismatch",
+  "inputs": {
+    "secret": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+    "salt": "706b652f76302e312f6b6579777261702f73616c74",
+    "info": "706b652f76302e312f6b6579777261702f696e666f000d736e61702d746573742d30303100410460fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb67903fe1008b8bc99a41ae9e95628bc64f2f1b20c2d7e9f5177a3c294d4462298",
+    "length": 32,
+    "reference_okm": "6652fb2ed7c49f62dbefb18522ce7984d50d0cee8050de08cdde48064cc441aa"
+  },
+  "expected": {
+    "okm_not_equal_reference": true,
+    "okm": "d088996a334ada20190dc363cacc100204d29ddd7ffc0f8f16b51a4819398ee8"
+  },
+  "valid": false,
+  "notes": "Negative: identical secret/salt but a single bit flipped in info MUST produce OKM != the positive vector's OKM."
+}
