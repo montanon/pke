@@ -160,7 +160,7 @@ final class IdentityEndpointsTests: XCTestCase {
         // 64 bytes of non-trivial content guarantees the standard-alphabet
         // base64 encoding would contain '+' and/or '/' for at least one
         // byte pattern — the assertion below pins the URL-safe alphabet.
-        let keyBytes = Data((0..<64).map { UInt8($0 &* 7 &+ 3) })
+        let keyBytes = Data((0..<64).map { UInt8(truncatingIfNeeded: $0 &* 7 &+ 3) })
         let expectedEncoded = PKECrypto.Base64URL.encode(keyBytes)
         XCTAssertFalse(expectedEncoded.contains("="))
         XCTAssertFalse(expectedEncoded.contains("+"))
