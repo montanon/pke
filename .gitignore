@@ -23,6 +23,7 @@ uv.lock
 DerivedData/
 *.xcuserdata/
 *.xcworkspace/xcuserdata/
+*.xcuserstate
 *.ipa
 *.dSYM.zip
 *.dSYM
@@ -36,6 +37,9 @@ xcuserdata/
 # SwiftPM
 .swiftpm/
 src/ios/.build/
+src/ios/build/
+src/ios/PKE.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+src/ios/PKE.xcodeproj/project.xcworkspace/xcuserdata/
 
 # Secrets — NEVER commit these
 .env

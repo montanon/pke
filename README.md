@@ -74,7 +74,7 @@ context/                  Public design docs, threat model, MVP scope (16 docs)
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) (package manager)
 - Docker (for local PostgreSQL)
-- Xcode 15+ (for iOS development)
+- Xcode 15.4+ with the iOS 17 Simulator runtime (for iOS development)
 
 ## Quick start
 
@@ -104,7 +104,28 @@ make ci         Run full CI checks locally
 make db         Start local PostgreSQL via Docker
 make serve      Run backend dev server (port 8000, requires main.py)
 make clean      Remove caches and build artifacts
+make ios-test   Run iOS Swift Package library tests (`swift test`)
+make ios-lint   Run SwiftLint on `src/ios/` sources
+make ios-app-test  Build and test the PKE iOS app via xcodebuild + iOS Simulator
 ```
+
+## iOS app
+
+The iOS app target lives in `src/ios/PKE.xcodeproj`. Library code (crypto, identity, protocol, witness, HTTP client) is defined in `src/ios/Package.swift` and consumed by the Xcode project as a local SwiftPM package.
+
+**Decision (HLAM-91):** the host app is hosted by an Xcode project, not an SPM-only package, because SwiftPM does not produce iOS application bundles. Library code stays in `Package.swift` to keep CI's `swift test` fast and Linux-friendly; the Xcode project links those products into the iOS app target.
+
+**Local development**
+
+```bash
+# Open in Xcode (run ⌘R on an iOS 17+ simulator)
+xed src/ios/PKE.xcodeproj
+
+# Or run the same xcodebuild invocation CI uses
+make ios-app-test
+```
+
+Requirements: macOS 14+, Xcode 15.4+ (defaults to the iOS 17 simulator runtime). Older Xcode versions fail with a deployment-target error.
 
 ## Development workflow
 
