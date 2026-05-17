@@ -2,17 +2,20 @@
 //
 // PKE — iOS Swift Package
 //
-// Declares three library targets and matching test targets:
+// Declares library targets and matching test targets:
 //
-//   PKECrypto    — primitives wrapping swift-crypto / CryptoKit
-//   PKEProtocol  — wire-level snapshot / attestation / ledger types
-//   PKEIdentity  — Keychain-backed identity (Apple platforms only)
+//   PKECrypto      — primitives wrapping swift-crypto / CryptoKit
+//   PKEProtocol    — wire-level snapshot / attestation / ledger types
+//   PKEIdentity    — Keychain-backed identity (Apple platforms only)
+//   PKEWitness     — transport-agnostic witness flow
+//   PKEHTTPClient  — backend REST transport (Apple platforms only)
 //
 // Cross-platform notes:
 //
-//   - PKEIdentity sources are wrapped in `#if canImport(Security)` so the
-//     module compiles to an empty translation unit on Linux. The library is
-//     still declared on every platform so dependents resolve.
+//   - PKEIdentity and PKEHTTPClient sources are wrapped in
+//     `#if canImport(Security)` so the modules compile to empty translation
+//     units on Linux. The libraries are still declared on every platform so
+//     dependents resolve.
 //
 //   - PKECryptoTests and PKEProtocolTests carry the shared test-vector
 //     corpus via symlinks under their `Resources/` directory, surfaced as
@@ -43,7 +46,8 @@ let package = Package(
         .library(name: "PKECrypto", targets: ["PKECrypto"]),
         .library(name: "PKEProtocol", targets: ["PKEProtocol"]),
         .library(name: "PKEIdentity", targets: ["PKEIdentity"]),
-        .library(name: "PKEWitness", targets: ["PKEWitness"])
+        .library(name: "PKEWitness", targets: ["PKEWitness"]),
+        .library(name: "PKEHTTPClient", targets: ["PKEHTTPClient"])
     ],
     dependencies: [
         .package(
@@ -72,6 +76,11 @@ let package = Package(
         .target(
             name: "PKEWitness",
             path: "PKE/Networking/Witness"
+        ),
+        .target(
+            name: "PKEHTTPClient",
+            dependencies: ["PKEIdentity", "PKECrypto"],
+            path: "PKE/Networking/HTTPClient"
         ),
         .testTarget(
             name: "PKECryptoTests",
@@ -105,6 +114,15 @@ let package = Package(
             name: "PKEWitnessTests",
             dependencies: ["PKEWitness"],
             path: "PKETests/Witness"
+        ),
+        .testTarget(
+            name: "PKEHTTPClientTests",
+            dependencies: [
+                "PKEHTTPClient",
+                "PKEIdentity",
+                .product(name: "Crypto", package: "swift-crypto")
+            ],
+            path: "PKETests/HTTPClient"
         )
     ]
 )
