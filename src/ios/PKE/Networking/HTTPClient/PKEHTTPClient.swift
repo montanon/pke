@@ -70,4 +70,16 @@ public actor PKEHTTPClient {
 public enum PKEHTTPClientError: Error, Equatable, Sendable {
     case nonHTTPResponse
 }
+
+// MARK: - Module-internal accessors
+
+internal extension PKEHTTPClient {
+
+    /// Read-only access to the injected `DeviceIdentity` for endpoint
+    /// extensions that need to sign outbound payloads (HLAM-148 +
+    /// HLAM-153/151/150 endpoint stories). Stays at the file level so the
+    /// `private let identity` storage remains private to the actor and the
+    /// surface area to other modules is unchanged.
+    var deviceIdentity: DeviceIdentity { identity }
+}
 #endif
