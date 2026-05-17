@@ -20,7 +20,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import text
-from sqlalchemy.exc import DataError, IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from pke_backend.config import get_settings
@@ -358,10 +358,16 @@ async def test_proximity_claim_round_trips_arbitrary_jsonb(engine: AsyncEngine) 
 
 
 async def test_transport_string_64_rejects_overflow(engine: AsyncEngine) -> None:
-    """AC #6: VARCHAR(64) rejects, never silently truncates."""
+    """AC #6: VARCHAR(64) rejects, never silently truncates.
+
+    asyncpg surfaces ``StringDataRightTruncationError`` via the generic
+    ``DBAPIError`` wrapper rather than SQLAlchemy's ``DataError`` subclass,
+    so we catch the broader base; ``IntegrityError`` is a sibling subclass
+    and would also satisfy the AC if a future driver mapped it differently.
+    """
     await _alembic_upgrade()
     snapshot_id = await _seed_snapshot(engine)
-    with pytest.raises((DataError, IntegrityError)):
+    with pytest.raises((DBAPIError, IntegrityError)):
         async with engine.begin() as conn:
             await conn.execute(
                 INSERT_ATTESTATION_SQL,
