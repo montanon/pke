@@ -1,7 +1,11 @@
 // Coverage for `AppNavigationState` — every acceptance criterion of
 // HLAM-92 plus the documented edge cases. `AppNavigationState` is
 // `@MainActor`-isolated so every test runs on the main actor.
+//
+// Gated `#if canImport(Combine)` because the type under test depends on
+// Combine, which is Apple-only.
 
+#if canImport(Combine)
 import Combine
 import XCTest
 @testable import PKEApp
@@ -225,3 +229,4 @@ final class AppNavigationStateTests: XCTestCase {
         cancellables.removeAll()
     }
 }
+#endif

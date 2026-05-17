@@ -16,7 +16,13 @@
 // `cancellationNotice` is set so the placeholder/role screen can surface a
 // "cancelled by user" banner. F9/F10/F11 will own the richer state-machine
 // cancellation; this slot is the minimum API for that handoff.
+//
+// Gated `#if canImport(Combine)` because `ObservableObject` and
+// `@Published` come from Combine, which is Apple-only. On Linux the type
+// is absent and the rest of `PKEApp` (Role, AppRoute) remains compilable
+// for cross-platform CI.
 
+#if canImport(Combine)
 import Combine
 import Foundation
 
@@ -83,3 +89,4 @@ public final class AppNavigationState: ObservableObject {
         cancellationNotice = nil
     }
 }
+#endif
