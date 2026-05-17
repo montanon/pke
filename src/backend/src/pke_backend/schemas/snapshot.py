@@ -12,6 +12,7 @@ canonicalization path, no chance of drift.
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Final, cast
 
@@ -29,6 +30,8 @@ from pke_backend.protocol.snapshot import MetadataPolicy, SnapshotCommitment
 
 __all__ = [
     "OWNER_SIGNING_PUBLIC_KEY_BYTES",
+    "BlobUploadedResponse",
+    "SnapshotCommittedResponse",
     "SnapshotCommitmentIn",
     "SnapshotOut",
 ]
@@ -188,3 +191,37 @@ class SnapshotOut(BaseModel):
             owner_signature=hex_encode(snapshot.owner_signature),
             ledger_entry_hash=hex_encode(ledger_entry_hash),
         )
+
+
+class SnapshotCommittedResponse(BaseModel):
+    """``POST /snapshots`` envelope.
+
+    Mirrors the shape of :class:`pke_backend.schemas.reports.ReportCreatedResponse`:
+    the resource id, the ledger anchor's ``ledger_entry_id``, and its
+    base64url-encoded ``entry_hash``. ``blob_upload_url`` is the relative URL
+    the client should POST the encrypted ciphertext to next, completing the
+    two-step commit-then-upload flow.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    snapshot_id: uuid.UUID
+    ledger_entry_id: uuid.UUID
+    ledger_entry_hash: str
+    blob_upload_url: str
+
+
+class BlobUploadedResponse(BaseModel):
+    """``POST /snapshots/{id}/blob`` envelope.
+
+    The handler returns the verified SHA-256 (base64url-encoded) so the client
+    can sanity-check it matches the commitment's ``ciphertext_hash`` before
+    declaring the upload complete. ``byte_length`` echoes the on-disk size for
+    operator observability — handy when chasing flaky uploads in logs.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    snapshot_id: uuid.UUID
+    ciphertext_sha256: str
+    byte_length: int

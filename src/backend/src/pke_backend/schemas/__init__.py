@@ -43,7 +43,9 @@ from pke_backend.schemas.reports import (
 )
 from pke_backend.schemas.snapshot import (
     OWNER_SIGNING_PUBLIC_KEY_BYTES,
+    BlobUploadedResponse,
     SnapshotCommitmentIn,
+    SnapshotCommittedResponse,
     SnapshotOut,
 )
 
@@ -55,6 +57,7 @@ __all__ = [
     "SIGNING_PUBLIC_KEY_BYTES",
     "WRAPPED_SNAPSHOT_KEY_BYTES",
     "WRAPPING_ALGORITHM_ALLOWLIST",
+    "BlobUploadedResponse",
     "FreezeCreatedResponse",
     "FreezeOut",
     "FreezesListResponse",
@@ -66,6 +69,7 @@ __all__ = [
     "ReportCreatedResponse",
     "ReportOut",
     "ReportsListResponse",
+    "SnapshotCommittedResponse",
     "SnapshotCommitmentIn",
     "SnapshotOut",
     "WitnessAttestationIn",

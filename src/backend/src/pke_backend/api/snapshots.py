@@ -29,11 +29,16 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pke_backend.api.errors import HTTPError
-from pke_backend.crypto.encoding import hex_encode
+from pke_backend.crypto.encoding import b64url_encode, hex_encode
 from pke_backend.db import get_session
 from pke_backend.schemas.freezes import FreezeOut, FreezesListResponse
 from pke_backend.schemas.reports import ReportOut, ReportsListResponse
-from pke_backend.schemas.snapshot import SnapshotOut
+from pke_backend.schemas.snapshot import (
+    BlobUploadedResponse,
+    SnapshotCommitmentIn,
+    SnapshotCommittedResponse,
+    SnapshotOut,
+)
 from pke_backend.services.blob_storage import (
     BlobNotFoundError,
     BlobStoreError,
@@ -43,8 +48,10 @@ from pke_backend.services.blob_storage import (
 from pke_backend.services.freezes import list_freezes_for_snapshot
 from pke_backend.services.reports import list_reports_for_snapshot
 from pke_backend.services.snapshots import (
+    create_snapshot_commitment,
     fetch_snapshot_for_response,
     get_snapshot_or_404,
+    store_snapshot_blob,
 )
 
 __all__ = ["router"]
@@ -284,4 +291,71 @@ async def list_snapshot_freezes(
             FreezeOut.from_persisted(row, ledger_entry_hash=ledger_hash)
             for row, ledger_hash in zip(rows, ledger_hashes, strict=True)
         ],
+    )
+
+
+@router.post(
+    "",
+    status_code=201,
+    response_model=SnapshotCommittedResponse,
+    responses={
+        409: {"description": "snapshot_id_conflict"},
+        422: {"description": "invalid_payload | hash_mismatch"},
+    },
+)
+async def post_snapshot(
+    commitment: SnapshotCommitmentIn,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> SnapshotCommittedResponse:
+    """Verify owner signature, persist the snapshot, anchor it on the ledger.
+
+    The handler is intentionally thin — every domain rule (UUID parse,
+    signature verify, INSERT-then-append ordering, ledger-chain dedup) lives
+    in :func:`pke_backend.services.snapshots.create_snapshot_commitment`. The
+    ``blob_upload_url`` we return is the relative POST path the client uses
+    next; we deliberately do not include the host so the value stays portable
+    behind whatever reverse proxy fronts the deployment.
+    """
+    snapshot, entry = await create_snapshot_commitment(session, commitment)
+    return SnapshotCommittedResponse(
+        snapshot_id=snapshot.snapshot_id,
+        ledger_entry_id=entry.ledger_entry_id,
+        ledger_entry_hash=b64url_encode(entry.entry_hash),
+        blob_upload_url=f"/snapshots/{snapshot.snapshot_id}/blob",
+    )
+
+
+@router.post(
+    "/{snapshot_id}/blob",
+    status_code=201,
+    response_model=BlobUploadedResponse,
+    responses={
+        404: {"description": "snapshot_not_found"},
+        409: {"description": "blob_already_uploaded"},
+        422: {"description": "hash_mismatch"},
+    },
+)
+async def post_snapshot_blob(
+    snapshot_id: str,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    blob_store: Annotated[FilesystemBlobStore, Depends(get_blob_store)],
+) -> BlobUploadedResponse:
+    """Accept the encrypted ciphertext for an existing snapshot row.
+
+    The body is read in full via :meth:`Request.body` so the service layer
+    can SHA-256 it before the BlobStore adapter ever touches disk — this
+    keeps the adapter free of a delete-on-mismatch path and makes
+    ``hash_mismatch`` a pure validation rejection that leaves zero on-disk
+    state behind. For MVP-sized blobs this is well within memory budget;
+    a future streaming path can sidestep the full read once a delete API
+    is added to :class:`BlobStore`.
+    """
+    snapshot_uuid = _parse_snapshot_uuid(snapshot_id)
+    body = await request.body()
+    snapshot, result = await store_snapshot_blob(session, blob_store, snapshot_uuid, body)
+    return BlobUploadedResponse(
+        snapshot_id=snapshot.snapshot_id,
+        ciphertext_sha256=b64url_encode(result.sha256),
+        byte_length=len(body),
     )

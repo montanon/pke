@@ -62,6 +62,7 @@ from pke_backend.models import (
 )
 from pke_backend.protocol.freeze import FREEZE_VERSION, FreezeAction
 from pke_backend.protocol.report_action import REPORT_VERSION, ReportAction
+from pke_backend.schemas.snapshot import SnapshotCommitmentIn
 from pke_backend.services.blob_storage import (
     FilesystemBlobStore,
     reset_blob_store_cache,
@@ -349,6 +350,58 @@ def build_signed_report(
     body = canonical_signed_body(action, "report_signature")
     sig = p256_sign(body, signer)
     base["report_signature"] = b64url_encode(sig)
+    return base
+
+
+def build_signed_commitment(
+    *,
+    signer: ec.EllipticCurvePrivateKey,
+    snapshot_id: uuid.UUID | None = None,
+    ciphertext_hash: bytes | None = None,
+    session_nonce: bytes | None = None,
+    capture_timestamp: str = "2026-05-15T00:00:00Z",
+    metadata_policy: dict[str, Any] | None = None,
+    encryption_public_key: bytes | None = None,
+    version: str = SNAPSHOT_VERSION,
+) -> dict[str, Any]:
+    """Build a wire-form dict for a signed snapshot commitment, ready to POST.
+
+    Mirrors :func:`build_signed_report` / :func:`build_signed_freeze`: writes
+    a zeroed signature, validates through :class:`SnapshotCommitmentIn` so
+    every length / encoding rule fires the same way it would for a real
+    client, computes the canonical signed body, signs it with ``signer``, and
+    swaps the real signature back in. The returned dict is the exact JSON
+    body the FastAPI handler receives — no FastAPI machinery is involved.
+    """
+    pubkey = _uncompressed_pubkey_bytes(signer)
+    sid = snapshot_id if snapshot_id is not None else uuid.uuid4()
+    cipher_hash = ciphertext_hash if ciphertext_hash is not None else b"\x11" * CIPHERTEXT_HASH_BYTES
+    nonce = session_nonce if session_nonce is not None else b"\x44" * SESSION_NONCE_BYTES
+    enc_pub = encryption_public_key if encryption_public_key is not None else b"\x04" + b"\x33" * 64
+    metadata = (
+        metadata_policy
+        if metadata_policy is not None
+        else {
+            "location_public": False,
+            "media_type": "photo",
+        }
+    )
+    base: dict[str, Any] = {
+        "type": "snapshot_commitment",
+        "version": version,
+        "snapshot_id": str(sid),
+        "ciphertext_hash": b64url_encode(cipher_hash),
+        "owner_signing_public_key": b64url_encode(pubkey),
+        "owner_encryption_public_key": b64url_encode(enc_pub),
+        "capture_timestamp": capture_timestamp,
+        "metadata_policy": metadata,
+        "session_nonce": b64url_encode(nonce),
+        "owner_signature": b64url_encode(b"\x00" * 64),
+    }
+    commitment = SnapshotCommitmentIn.model_validate(base)
+    body = canonical_signed_body(commitment, "owner_signature")
+    sig = p256_sign(body, signer)
+    base["owner_signature"] = b64url_encode(sig)
     return base
 
 
