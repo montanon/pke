@@ -18,7 +18,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         let fake = FakeMPCCapturerChannel()
         let transport = MPCWitnessTransport { fake }
 
-        let stream = transport.runCapturer(session: makeSession())
+        let stream = transport.runCapturer(session: mpcSession())
         fake.finishEvents()
         _ = await collect(stream)
 
@@ -35,8 +35,8 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         let vendor = FakeChannelVendor()
         let transport = MPCWitnessTransport { vendor.make() }
 
-        let first = transport.runCapturer(session: makeSession())
-        let second = transport.runCapturer(session: makeSession())
+        let first = transport.runCapturer(session: mpcSession())
+        let second = transport.runCapturer(session: mpcSession())
         for channel in vendor.channels {
             channel.finishEvents()
         }
@@ -54,7 +54,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         let fake = FakeMPCCapturerChannel()
         let transport = MPCWitnessTransport { fake }
 
-        let stream = transport.runCapturer(session: makeSession(commitment: commitment))
+        let stream = transport.runCapturer(session: mpcSession(commitment: commitment))
         fake.emit(.peerConnected(peerA))
         fake.finishEvents()
         _ = await collect(stream)
@@ -71,7 +71,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         let fake = FakeMPCCapturerChannel()
         let transport = MPCWitnessTransport { fake }
 
-        let stream = transport.runCapturer(session: makeSession())
+        let stream = transport.runCapturer(session: mpcSession())
         fake.emit(.peerConnected(peerA))
         fake.emit(.dataReceived(peer: peerA, data: try frame([0x10, 0x20])))
         fake.finishEvents()
@@ -85,7 +85,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         let fake = FakeMPCCapturerChannel()
         let transport = MPCWitnessTransport { fake }
 
-        let stream = transport.runCapturer(session: makeSession())
+        let stream = transport.runCapturer(session: mpcSession())
         fake.emit(.peerConnected(peerA))
         fake.emit(.dataReceived(peer: peerA, data: try frame([0x01])))
         fake.finishEvents()
@@ -99,7 +99,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         let fake = FakeMPCCapturerChannel()
         let transport = MPCWitnessTransport { fake }
 
-        let stream = transport.runCapturer(session: makeSession())
+        let stream = transport.runCapturer(session: mpcSession())
         await transport.stop()
 
         let received = await collect(stream)
@@ -111,7 +111,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         let fake = FakeMPCCapturerChannel()
         let transport = MPCWitnessTransport { fake }
 
-        let stream = transport.runCapturer(session: makeSession())
+        let stream = transport.runCapturer(session: mpcSession())
         fake.finishEvents()
 
         let received = await collect(stream)
@@ -123,7 +123,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         let fake = FakeMPCCapturerChannel()
         let transport = MPCWitnessTransport { fake }
 
-        let stream = transport.runCapturer(session: makeSession())
+        let stream = transport.runCapturer(session: mpcSession())
         let peers = (0..<4).map { MPCPeerHandle(id: "pke-peer\($0)") }
         for (index, peer) in peers.enumerated() {
             fake.emit(.peerConnected(peer))
@@ -144,7 +144,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         let transport = MPCWitnessTransport { fake }
 
         await transport.stop()
-        let stream = transport.runCapturer(session: makeSession())
+        let stream = transport.runCapturer(session: mpcSession())
 
         let received = await collect(stream)
         XCTAssertTrue(received.isEmpty)
@@ -171,7 +171,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
 
 private let peerA = MPCPeerHandle(id: "pke-aaaa1111")
 
-private func makeSession(
+private func mpcSession(
     commitment: SnapshotCommitment = SnapshotCommitment(rawValue: Data([0xAA]))
 ) -> WitnessSession {
     WitnessSession(sessionNonce: SessionNonce(rawValue: Data([0x01])), commitment: commitment)
