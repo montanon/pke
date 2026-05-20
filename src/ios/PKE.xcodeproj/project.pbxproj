@@ -13,6 +13,7 @@
 		A1B0000000000000000000A4 /* PKEProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = C100000000000000000000C3 /* PKEProtocol */; };
 		A1B0000000000000000000A6 /* PKEApp in Frameworks */ = {isa = PBXBuildFile; productRef = C100000000000000000000C4 /* PKEApp */; };
 		B1B0000000000000000000B0 /* PlaceholderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000B0 /* PlaceholderTests.swift */; };
+		B1B0000000000000000000B3 /* InfoPlistTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000B1 /* InfoPlistTests.swift */; };
 		B1B0000000000000000000B1 /* PKEApp in Frameworks */ = {isa = PBXBuildFile; productRef = C100000000000000000000C5 /* PKEApp */; };
 /* End PBXBuildFile section */
 
@@ -30,6 +31,7 @@
 		A1A0000000000000000000A5 /* PKEAppHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PKEAppHost.swift; sourceTree = "<group>"; };
 		A1A0000000000000000000A2 /* PKE.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PKE.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1A0000000000000000000B0 /* PlaceholderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceholderTests.swift; sourceTree = "<group>"; };
+		B1A0000000000000000000B1 /* InfoPlistTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoPlistTests.swift; sourceTree = "<group>"; };
 		B1A0000000000000000000B2 /* PKEAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PKEAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -77,6 +79,7 @@
 			isa = PBXGroup;
 			children = (
 				B1A0000000000000000000B0 /* PlaceholderTests.swift */,
+				B1A0000000000000000000B1 /* InfoPlistTests.swift */,
 			);
 			path = PKEAppTests;
 			sourceTree = "<group>";
@@ -209,6 +212,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B1B0000000000000000000B0 /* PlaceholderTests.swift in Sources */,
+				B1B0000000000000000000B3 /* InfoPlistTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -234,6 +238,7 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PKE/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -264,6 +269,7 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PKE/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

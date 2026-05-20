@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_pke-witness._tcp</string>
+		<string>_pke-witness._udp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>PKE uses your local network to discover nearby witness devices and collect their signed attestations for evidence you capture. No content leaves your device unencrypted.</string>
+</dict>
+</plist>
