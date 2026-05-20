@@ -16,7 +16,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
     // AC #1 — advertises with a random "pke-" + 8 hex display name.
     func test_runCapturer_advertisesWithRandomPKEPrefixedName() async throws {
         let fake = FakeMPCCapturerChannel()
-        let transport = MPCWitnessTransport(channelFactory: { fake })
+        let transport = MPCWitnessTransport { fake }
 
         let stream = transport.runCapturer(session: makeSession())
         fake.finishEvents()
@@ -33,7 +33,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
     // AC #1 — distinct random name per session.
     func test_runCapturer_twoSessions_useDistinctNames() async {
         let vendor = FakeChannelVendor()
-        let transport = MPCWitnessTransport(channelFactory: { vendor.make() })
+        let transport = MPCWitnessTransport { vendor.make() }
 
         let first = transport.runCapturer(session: makeSession())
         let second = transport.runCapturer(session: makeSession())
@@ -52,7 +52,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
     func test_onPeerConnected_sendsFramedCommitment() async throws {
         let commitment = SnapshotCommitment(rawValue: Data([0xAA, 0xBB, 0xCC]))
         let fake = FakeMPCCapturerChannel()
-        let transport = MPCWitnessTransport(channelFactory: { fake })
+        let transport = MPCWitnessTransport { fake }
 
         let stream = transport.runCapturer(session: makeSession(commitment: commitment))
         fake.emit(.peerConnected(peerA))
@@ -69,7 +69,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
     // AC #3 — a framed attestation byte is parsed and emitted.
     func test_onAttestationFrame_parsesAndEmitsToStream() async throws {
         let fake = FakeMPCCapturerChannel()
-        let transport = MPCWitnessTransport(channelFactory: { fake })
+        let transport = MPCWitnessTransport { fake }
 
         let stream = transport.runCapturer(session: makeSession())
         fake.emit(.peerConnected(peerA))
@@ -83,7 +83,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
     // AC #4 — peer disconnected after its attestation is collected.
     func test_peerDisconnectedAfterAttestationReceipt() async throws {
         let fake = FakeMPCCapturerChannel()
-        let transport = MPCWitnessTransport(channelFactory: { fake })
+        let transport = MPCWitnessTransport { fake }
 
         let stream = transport.runCapturer(session: makeSession())
         fake.emit(.peerConnected(peerA))
@@ -97,7 +97,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
     // AC #5 — stream finishes cleanly on stop() with zero values.
     func test_streamFinishesOnStop() async {
         let fake = FakeMPCCapturerChannel()
-        let transport = MPCWitnessTransport(channelFactory: { fake })
+        let transport = MPCWitnessTransport { fake }
 
         let stream = transport.runCapturer(session: makeSession())
         await transport.stop()
@@ -109,7 +109,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
     // AC #5 — stream finishes when the channel's event stream ends.
     func test_streamFinishesWhenChannelEventsEnd() async {
         let fake = FakeMPCCapturerChannel()
-        let transport = MPCWitnessTransport(channelFactory: { fake })
+        let transport = MPCWitnessTransport { fake }
 
         let stream = transport.runCapturer(session: makeSession())
         fake.finishEvents()
@@ -121,7 +121,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
     // AC #6 — N attestations emitted in submission order.
     func test_N_attestations_emittedInOrder() async throws {
         let fake = FakeMPCCapturerChannel()
-        let transport = MPCWitnessTransport(channelFactory: { fake })
+        let transport = MPCWitnessTransport { fake }
 
         let stream = transport.runCapturer(session: makeSession())
         let peers = (0..<4).map { MPCPeerHandle(id: "pke-peer\($0)") }
@@ -141,7 +141,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
     // AC #5 edge — runCapturer after stop() yields an empty finished stream.
     func test_stopBeforeRunCapturer_finishesImmediately() async {
         let fake = FakeMPCCapturerChannel()
-        let transport = MPCWitnessTransport(channelFactory: { fake })
+        let transport = MPCWitnessTransport { fake }
 
         await transport.stop()
         let stream = transport.runCapturer(session: makeSession())
@@ -152,7 +152,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
 
     // runWitness is HLAM-159 — placeholder conformance contract.
     func test_runWitness_throwsNotImplemented() async {
-        let transport = MPCWitnessTransport(channelFactory: { FakeMPCCapturerChannel() })
+        let transport = MPCWitnessTransport { FakeMPCCapturerChannel() }
         do {
             try await transport.runWitness { _ in WitnessAttestation(rawValue: Data()) }
             XCTFail("runWitness should throw witnessRoleNotImplemented")
@@ -162,7 +162,7 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
     }
 
     func test_transportID_isMultipeerConnectivity() {
-        let transport = MPCWitnessTransport(channelFactory: { FakeMPCCapturerChannel() })
+        let transport = MPCWitnessTransport { FakeMPCCapturerChannel() }
         XCTAssertEqual(transport.transportID, "multipeerconnectivity")
     }
 }

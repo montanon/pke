@@ -75,7 +75,7 @@ public actor MPCWitnessTransport: WitnessTransport {
     /// Per-connection idle timeout (HLAM-52 Story 6 — not enforced here).
     public static let perConnectionIdleTimeout: TimeInterval = 5
 
-    public nonisolated var transportID: String { "multipeerconnectivity" }
+    nonisolated public var transportID: String { "multipeerconnectivity" }
 
     private let channelFactory: @Sendable () -> any MPCCapturerChannel
     private var activeChannels: [any MPCCapturerChannel] = []
@@ -89,7 +89,7 @@ public actor MPCWitnessTransport: WitnessTransport {
 
     // MARK: - WitnessTransport
 
-    public nonisolated func runCapturer(
+    nonisolated public func runCapturer(
         session: WitnessSession
     ) -> AsyncStream<WitnessAttestation> {
         let channel = channelFactory()
@@ -211,7 +211,7 @@ extension MPCWitnessTransport {
     /// Convenience initializer wiring the real `MCSession`-backed
     /// channel. Available only where MultipeerConnectivity exists.
     public init() {
-        self.init(channelFactory: { MPCSessionCapturerChannel() })
+        self.init { MPCSessionCapturerChannel() }
     }
 }
 #endif
