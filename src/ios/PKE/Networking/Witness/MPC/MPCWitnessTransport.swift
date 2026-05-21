@@ -10,8 +10,12 @@
 // `#if canImport(MultipeerConnectivity)`-gated; unit tests inject a
 // no-op fake. This keeps the capturer flow testable on Linux CI.
 //
-// `runWitness` is HLAM-159 — shipped here as a placeholder that throws,
-// purely to satisfy `WitnessTransport` conformance.
+// HLAM-159 adds the witness role (`runWitness`). It mirrors the capturer
+// design: the flow is decoupled from MultipeerConnectivity behind the
+// `MPCWitnessChannel` seam (browser side) — discovery / data events,
+// framed sends, and a single `stop()`. The real `MCNearbyServiceBrowser`-
+// backed conformer (`MPCSessionWitnessChannel`) is
+// `#if canImport(MultipeerConnectivity)`-gated; unit tests inject a fake.
 
 import Foundation
 
@@ -55,15 +59,46 @@ public protocol MPCCapturerChannel: AnyObject, Sendable {
     func stop() async
 }
 
+/// Events surfaced by an `MPCWitnessChannel` while browsing.
+public enum MPCWitnessEvent: Sendable {
+    case peerConnected(MPCPeerHandle)
+    case dataReceived(peer: MPCPeerHandle, data: Data)
+    case peerDisconnected(MPCPeerHandle)
+}
+
+/// Witness-side seam over an MPC session: browse for capturers, observe
+/// peer events, send framed payloads, disconnect peers, and tear down.
+/// Conformers are reference types so the transport can track active
+/// channels by identity.
+public protocol MPCWitnessChannel: AnyObject, Sendable {
+    /// Connection / data / disconnection events for discovered peers.
+    /// Finishes when `stop()` is called.
+    var events: AsyncStream<MPCWitnessEvent> { get }
+
+    /// Begin browsing for advertised capturers under `displayName`.
+    func startBrowsing(displayName: String) async
+
+    /// Send an already-framed payload to a single connected peer.
+    func send(_ data: Data, toPeer peer: MPCPeerHandle) async
+
+    /// Drop a single peer once its attestation has been delivered.
+    func disconnect(_ peer: MPCPeerHandle) async
+
+    /// Stop browsing, disconnect everyone, and finish `events`.
+    func stop() async
+}
+
 public enum MPCWitnessTransportError: Error, Equatable, Sendable {
-    /// `runWitness` is implemented by HLAM-159; this transport build
-    /// only ships the capturer role.
-    case witnessRoleNotImplemented
+    /// `runWitness` was called on a transport constructed without a
+    /// witness channel factory (capturer-only construction).
+    case witnessChannelUnavailable
 }
 
 /// `MultipeerConnectivity` witness transport — foreground-primary
-/// witness path. This build implements the capturer role
-/// (`runCapturer`); see `MPCWitnessTransportError.witnessRoleNotImplemented`.
+/// witness path. Implements both roles: `runCapturer` (advertise) and
+/// `runWitness` (browse). A capturer-only transport may omit the
+/// witness channel factory; `runWitness` then throws
+/// `MPCWitnessTransportError.witnessChannelUnavailable`.
 public actor MPCWitnessTransport: WitnessTransport {
 
     /// MPC service type — ≤15 chars, lowercase + hyphens per MPC rules.
@@ -87,21 +122,27 @@ public actor MPCWitnessTransport: WitnessTransport {
     nonisolated public var transportID: String { "multipeerconnectivity" }
 
     private let channelFactory: @Sendable () -> any MPCCapturerChannel
+    private let witnessChannelFactory: (@Sendable () -> any MPCWitnessChannel)?
     private let idleTimeout: TimeInterval
     private let sleep: @Sendable (TimeInterval) async -> Void
     private var activeChannels: [any MPCCapturerChannel] = []
+    private var activeWitnessChannels: [any MPCWitnessChannel] = []
     private var isStopped = false
 
     /// Designated initializer. `channelFactory` vends one channel per
-    /// `runCapturer` call; tests inject a fake here. `idleTimeout` and
+    /// `runCapturer` call; `witnessChannelFactory` vends one per
+    /// `runWitness` call. Tests inject fakes here; a capturer-only
+    /// transport may omit `witnessChannelFactory`. `idleTimeout` and
     /// `sleep` are injectable so unit tests can drive the per-connection
     /// timeout deterministically without wall-clock waits.
     public init(
         channelFactory: @escaping @Sendable () -> any MPCCapturerChannel,
+        witnessChannelFactory: (@Sendable () -> any MPCWitnessChannel)? = nil,
         idleTimeout: TimeInterval = MPCWitnessTransport.perConnectionIdleTimeout,
         sleep: @escaping @Sendable (TimeInterval) async -> Void = MPCWitnessTransport.defaultSleep
     ) {
         self.channelFactory = channelFactory
+        self.witnessChannelFactory = witnessChannelFactory
         self.idleTimeout = idleTimeout
         self.sleep = sleep
     }
@@ -163,15 +204,32 @@ public actor MPCWitnessTransport: WitnessTransport {
     public func runWitness(
         sign: @escaping @Sendable (WitnessSession) async throws -> WitnessAttestation
     ) async throws {
-        _ = sign
-        throw MPCWitnessTransportError.witnessRoleNotImplemented
+        guard let witnessChannelFactory else {
+            throw MPCWitnessTransportError.witnessChannelUnavailable
+        }
+        guard !isStopped else { return }
+        let channel = witnessChannelFactory()
+        activeWitnessChannels.append(channel)
+        await channel.startBrowsing(displayName: Self.makeDisplayName())
+        do {
+            try await driveWitness(channel: channel, sign: sign)
+        } catch {
+            await teardownWitness(channel: channel)
+            throw error
+        }
+        await teardownWitness(channel: channel)
     }
 
     public func stop() async {
         isStopped = true
         let channels = activeChannels
+        let witnessChannels = activeWitnessChannels
         activeChannels.removeAll()
+        activeWitnessChannels.removeAll()
         for channel in channels {
+            await channel.stop()
+        }
+        for channel in witnessChannels {
             await channel.stop()
         }
     }
@@ -328,6 +386,77 @@ public actor MPCWitnessTransport: WitnessTransport {
         }
     }
 
+    // MARK: - Witness flow
+
+    private func driveWitness(
+        channel: any MPCWitnessChannel,
+        sign: @escaping @Sendable (WitnessSession) async throws -> WitnessAttestation
+    ) async throws {
+        var accumulators: [MPCPeerHandle: MPCFrameAccumulator] = [:]
+        var servedPeers: Set<MPCPeerHandle> = []
+        for await event in channel.events {
+            switch event {
+            case let .peerConnected(peer):
+                accumulators[peer] = MPCFrameAccumulator()
+            case let .dataReceived(peer, data):
+                guard !servedPeers.contains(peer),
+                      let accumulator = accumulators[peer] else { continue }
+                let frames: [Data]
+                do {
+                    frames = try accumulator.append(data)
+                } catch {
+                    // Poisoned accumulator (oversize declared length) —
+                    // drop the peer rather than buffer unbounded bytes.
+                    accumulators[peer] = nil
+                    await channel.disconnect(peer)
+                    continue
+                }
+                guard let commitmentFrame = frames.first else { continue }
+                accumulators[peer] = nil
+                servedPeers.insert(peer)
+                try await respond(
+                    channel: channel,
+                    peer: peer,
+                    commitment: commitmentFrame,
+                    sign: sign
+                )
+            case let .peerDisconnected(peer):
+                accumulators[peer] = nil
+            }
+        }
+    }
+
+    /// Builds the `WitnessSession`, invokes `sign`, frames the returned
+    /// attestation, sends it back over the same session, and drops the
+    /// peer (AC #3–#5). The capturer wire format carries only the
+    /// commitment, so the session nonce is empty here.
+    private func respond(
+        channel: any MPCWitnessChannel,
+        peer: MPCPeerHandle,
+        commitment: Data,
+        sign: @escaping @Sendable (WitnessSession) async throws -> WitnessAttestation
+    ) async throws {
+        let session = WitnessSession(
+            sessionNonce: SessionNonce(rawValue: Data()),
+            commitment: SnapshotCommitment(rawValue: commitment)
+        )
+        let attestation = try await sign(session)
+        let frame: Data
+        do {
+            frame = try MPCMessageFraming.encode(attestation.rawValue)
+        } catch {
+            await channel.disconnect(peer)
+            return
+        }
+        await channel.send(frame, toPeer: peer)
+        await channel.disconnect(peer)
+    }
+
+    private func teardownWitness(channel: any MPCWitnessChannel) async {
+        await channel.stop()
+        activeWitnessChannels.removeAll { $0 === channel }
+    }
+
     /// Random per-session display name — `"pke-"` + 8 lowercase hex
     /// digits (AC #1). Privacy-preserving: real identity travels in the
     /// signed attestation payload, not the broadcast name.
@@ -339,9 +468,13 @@ public actor MPCWitnessTransport: WitnessTransport {
 #if canImport(MultipeerConnectivity)
 extension MPCWitnessTransport {
     /// Convenience initializer wiring the real `MCSession`-backed
-    /// channel. Available only where MultipeerConnectivity exists.
+    /// channels for both roles. Available only where
+    /// MultipeerConnectivity exists.
     public init() {
-        self.init { MPCSessionCapturerChannel() }
+        self.init(
+            channelFactory: { MPCSessionCapturerChannel() },
+            witnessChannelFactory: { MPCSessionWitnessChannel() }
+        )
     }
 }
 #endif
