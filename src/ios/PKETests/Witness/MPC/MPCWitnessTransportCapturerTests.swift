@@ -165,11 +165,110 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         let transport = MPCWitnessTransport { FakeMPCCapturerChannel() }
         XCTAssertEqual(transport.transportID, "multipeerconnectivity")
     }
+
+    // MARK: - HLAM-161 — session rotation + idle timeout
+
+    // AC #3 — the per-connection idle timeout is 5 seconds.
+    func test_perConnectionIdleTimeout_defaultsToFiveSeconds() {
+        XCTAssertEqual(MPCWitnessTransport.perConnectionIdleTimeout, 5)
+    }
+
+    // AC #3 / #5 — a peer that connects but never sends an attestation
+    // is disconnected once its idle timeout elapses.
+    func test_stalledPeer_droppedAfterIdleTimeout() async {
+        let fake = FakeMPCCapturerChannel()
+        let sleeper = ControllableSleeper()
+        let transport = MPCWitnessTransport(
+            channelFactory: { fake },
+            sleep: { await sleeper.sleep($0) }
+        )
+
+        let stream = transport.runCapturer(session: mpcSession())
+        fake.emit(.peerConnected(peerA))
+        await sleeper.awaitSleepers(count: 1)
+        sleeper.fireAll()                       // 5 seconds "elapse"
+        fake.finishEvents()
+
+        let received = await collect(stream)
+        XCTAssertTrue(received.isEmpty)
+        XCTAssertEqual(fake.disconnected, [peerA])
+    }
+
+    // AC #5 — rotation: after a stalled peer is dropped, a new peer can
+    // still connect and have its attestation collected.
+    func test_rotation_newPeerProceedsAfterStalledPeerDropped() async throws {
+        let fake = FakeMPCCapturerChannel()
+        let sleeper = ControllableSleeper()
+        let transport = MPCWitnessTransport(
+            channelFactory: { fake },
+            sleep: { await sleeper.sleep($0) }
+        )
+
+        let stream = transport.runCapturer(session: mpcSession())
+        fake.emit(.peerConnected(peerA))         // stalls — never attests
+        await sleeper.awaitSleepers(count: 1)
+        sleeper.fireAll()                        // peerA times out
+        fake.emit(.peerConnected(peerB))         // rotation: freed slot reused
+        await sleeper.awaitSleepers(count: 1)
+        fake.emit(.dataReceived(peer: peerB, data: try frame([0x42])))
+        fake.finishEvents()
+        sleeper.fireAll()                        // drain peerB's cancelled timer
+
+        let received = await collect(stream)
+        XCTAssertEqual(received, [WitnessAttestation(rawValue: Data([0x42]))])
+        XCTAssertTrue(fake.disconnected.contains(peerA))
+        XCTAssertTrue(fake.disconnected.contains(peerB))
+    }
+
+    // AC #1 / #3 — a peer that attests is disconnected exactly once; a
+    // stale idle timeout fired afterwards must not disconnect it again.
+    func test_peerThatAttests_notDisconnectedAgainByStaleTimeout() async throws {
+        let fake = FakeMPCCapturerChannel()
+        let sleeper = ControllableSleeper()
+        let transport = MPCWitnessTransport(
+            channelFactory: { fake },
+            sleep: { await sleeper.sleep($0) }
+        )
+
+        let stream = transport.runCapturer(session: mpcSession())
+        fake.emit(.peerConnected(peerA))
+        await sleeper.awaitSleepers(count: 1)
+        fake.emit(.dataReceived(peer: peerA, data: try frame([0x07])))
+        fake.finishEvents()
+        sleeper.fireAll()                        // stale timer — must be ignored
+
+        let received = await collect(stream)
+        XCTAssertEqual(received, [WitnessAttestation(rawValue: Data([0x07]))])
+        XCTAssertEqual(fake.disconnected, [peerA])
+    }
+
+    // AC #3 — a timeout that fires after the peer already left on its own
+    // must not trigger a spurious disconnect.
+    func test_idleTimeout_ignoredAfterPeerDisconnected() async {
+        let fake = FakeMPCCapturerChannel()
+        let sleeper = ControllableSleeper()
+        let transport = MPCWitnessTransport(
+            channelFactory: { fake },
+            sleep: { await sleeper.sleep($0) }
+        )
+
+        let stream = transport.runCapturer(session: mpcSession())
+        fake.emit(.peerConnected(peerA))
+        await sleeper.awaitSleepers(count: 1)
+        fake.emit(.peerDisconnected(peerA))
+        fake.finishEvents()
+        sleeper.fireAll()
+
+        let received = await collect(stream)
+        XCTAssertTrue(received.isEmpty)
+        XCTAssertTrue(fake.disconnected.isEmpty)
+    }
 }
 
 // MARK: - Fixtures
 
 private let peerA = MPCPeerHandle(id: "pke-aaaa1111")
+private let peerB = MPCPeerHandle(id: "pke-bbbb2222")
 
 private func mpcSession(
     commitment: SnapshotCommitment = SnapshotCommitment(rawValue: Data([0xAA]))
@@ -286,5 +385,57 @@ final class FakeChannelVendor: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return made
+    }
+}
+
+// MARK: - Controllable sleeper
+
+/// Injectable `sleep` for the transport's idle timer. Every sleep call
+/// suspends until the test calls `fireAll()`, so the 5-second timeout is
+/// driven deterministically with zero wall-clock waits. `awaitSleepers`
+/// lets a test wait until the timer task has actually registered before
+/// firing, removing scheduling races.
+final class ControllableSleeper: @unchecked Sendable {
+    private let lock = NSLock()
+    private var pending: [CheckedContinuation<Void, Never>] = []
+    private var registrationWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func sleep(_ duration: TimeInterval) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            lock.lock()
+            pending.append(continuation)
+            let waiters = registrationWaiters
+            registrationWaiters.removeAll()
+            lock.unlock()
+            for waiter in waiters {
+                waiter.resume()
+            }
+        }
+    }
+
+    /// Suspends until at least `count` sleep calls are registered.
+    func awaitSleepers(count: Int) async {
+        while true {
+            lock.lock()
+            if pending.count >= count {
+                lock.unlock()
+                return
+            }
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                registrationWaiters.append(continuation)
+                lock.unlock()
+            }
+        }
+    }
+
+    /// Resumes every currently-suspended sleep — the "timeout elapsed".
+    func fireAll() {
+        lock.lock()
+        let resumable = pending
+        pending.removeAll()
+        lock.unlock()
+        for continuation in resumable {
+            continuation.resume()
+        }
     }
 }

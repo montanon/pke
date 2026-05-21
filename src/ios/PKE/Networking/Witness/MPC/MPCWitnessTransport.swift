@@ -72,19 +72,45 @@ public actor MPCWitnessTransport: WitnessTransport {
     /// `NSBonjourServices` Info.plist entries for `serviceType`.
     public static let bonjourServices = ["_pke-witness._tcp", "_pke-witness._udp"]
 
-    /// Per-connection idle timeout (HLAM-52 Story 6 — not enforced here).
+    /// Per-connection idle timeout (HLAM-161). A peer that has not
+    /// delivered a complete attestation within this window is dropped,
+    /// freeing its MPC slot for the next witness.
     public static let perConnectionIdleTimeout: TimeInterval = 5
+
+    /// Default idle-timer sleep — wraps `Task.sleep`. Returns early
+    /// (without throwing) on cancellation so the timer task can exit
+    /// cleanly during teardown.
+    static let defaultSleep: @Sendable (TimeInterval) async -> Void = { seconds in
+        try? await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000))
+    }
 
     nonisolated public var transportID: String { "multipeerconnectivity" }
 
     private let channelFactory: @Sendable () -> any MPCCapturerChannel
+    private let idleTimeout: TimeInterval
+    private let sleep: @Sendable (TimeInterval) async -> Void
     private var activeChannels: [any MPCCapturerChannel] = []
     private var isStopped = false
 
     /// Designated initializer. `channelFactory` vends one channel per
-    /// `runCapturer` call; tests inject a fake here.
-    public init(channelFactory: @escaping @Sendable () -> any MPCCapturerChannel) {
+    /// `runCapturer` call; tests inject a fake here. `idleTimeout` and
+    /// `sleep` are injectable so unit tests can drive the per-connection
+    /// timeout deterministically without wall-clock waits.
+    public init(
+        channelFactory: @escaping @Sendable () -> any MPCCapturerChannel,
+        idleTimeout: TimeInterval = MPCWitnessTransport.perConnectionIdleTimeout,
+        sleep: @escaping @Sendable (TimeInterval) async -> Void = MPCWitnessTransport.defaultSleep
+    ) {
         self.channelFactory = channelFactory
+        self.idleTimeout = idleTimeout
+        self.sleep = sleep
+    }
+
+    /// One step consumed by the capturer event loop: either an event
+    /// from the MPC channel or a fired per-connection idle timeout.
+    private enum CapturerStep: Sendable {
+        case event(MPCCapturerEvent)
+        case idleTimeout(peer: MPCPeerHandle, generation: Int)
     }
 
     // MARK: - WitnessTransport
@@ -153,13 +179,55 @@ public actor MPCWitnessTransport: WitnessTransport {
         } catch {
             return
         }
+
+        // Merge channel events and fired idle timeouts into one stream so
+        // a single serial loop owns all per-peer state. The forwarder
+        // finishes `steps` when the channel's own events end, which ends
+        // the loop below.
+        let (steps, stepContinuation) = AsyncStream<CapturerStep>.makeStream()
+        let forwarder = Task {
+            for await event in channel.events {
+                stepContinuation.yield(.event(event))
+            }
+            stepContinuation.finish()
+        }
+
         var accumulators: [MPCPeerHandle: MPCFrameAccumulator] = [:]
-        for await event in channel.events {
-            switch event {
-            case let .peerConnected(peer):
+        var timeoutGeneration: [MPCPeerHandle: Int] = [:]
+        var timeoutTasks: [MPCPeerHandle: Task<Void, Never>] = [:]
+        var nextGeneration = 0
+
+        // Starts the 5s idle timer for a freshly connected peer. The
+        // monotonic generation tags the fired timeout so a stale fire
+        // (peer already completed, disconnected, or reconnected under the
+        // same handle) is ignored by the loop.
+        func startIdleTimer(for peer: MPCPeerHandle) {
+            let generation = nextGeneration
+            nextGeneration += 1
+            timeoutGeneration[peer] = generation
+            let sleep = self.sleep
+            let timeout = self.idleTimeout
+            timeoutTasks[peer]?.cancel()
+            timeoutTasks[peer] = Task {
+                await sleep(timeout)
+                guard !Task.isCancelled else { return }
+                stepContinuation.yield(.idleTimeout(peer: peer, generation: generation))
+            }
+        }
+
+        func clearIdleTimer(for peer: MPCPeerHandle) {
+            timeoutTasks[peer]?.cancel()
+            timeoutTasks[peer] = nil
+            timeoutGeneration[peer] = nil
+        }
+
+        for await step in steps {
+            switch step {
+            case let .event(.peerConnected(peer)):
                 accumulators[peer] = MPCFrameAccumulator()
+                startIdleTimer(for: peer)
                 await channel.send(commitmentFrame, toPeer: peer)
-            case let .dataReceived(peer, data):
+            case let .event(.dataReceived(peer, data)):
                 guard let accumulator = accumulators[peer] else { continue }
                 let frames = Self.drain(accumulator, appending: data)
                 for frame in frames {
@@ -167,11 +235,26 @@ public actor MPCWitnessTransport: WitnessTransport {
                 }
                 if !frames.isEmpty {
                     accumulators[peer] = nil
+                    clearIdleTimer(for: peer)
                     await channel.disconnect(peer)
                 }
-            case let .peerDisconnected(peer):
+            case let .event(.peerDisconnected(peer)):
                 accumulators[peer] = nil
+                clearIdleTimer(for: peer)
+            case let .idleTimeout(peer, generation):
+                // Honor only if still the current timer and the peer has
+                // not yet completed — otherwise the fire is stale.
+                guard timeoutGeneration[peer] == generation,
+                      accumulators[peer] != nil else { continue }
+                accumulators[peer] = nil
+                clearIdleTimer(for: peer)
+                await channel.disconnect(peer)
             }
+        }
+
+        forwarder.cancel()
+        for task in timeoutTasks.values {
+            task.cancel()
         }
     }
 
