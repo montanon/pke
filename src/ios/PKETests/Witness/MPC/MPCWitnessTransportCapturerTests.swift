@@ -205,17 +205,25 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         )
 
         let stream = transport.runCapturer(session: mpcSession())
+        var iterator = stream.makeAsyncIterator()
+
         fake.emit(.peerConnected(peerA))         // stalls — never attests
         await sleeper.awaitSleepers(count: 1)
-        sleeper.fireAll()                        // peerA times out
+        sleeper.fireAll()                        // peerA times out, slot freed
+
         fake.emit(.peerConnected(peerB))         // rotation: freed slot reused
         await sleeper.awaitSleepers(count: 1)
         fake.emit(.dataReceived(peer: peerB, data: try frame([0x42])))
-        fake.finishEvents()
-        sleeper.fireAll()                        // drain peerB's cancelled timer
 
-        let received = await collect(stream)
-        XCTAssertEqual(received, [WitnessAttestation(rawValue: Data([0x42]))])
+        // Block until peerB's attestation lands — proves the data event was
+        // processed before the leftover timer is fired below.
+        let attestation = await iterator.next()
+        XCTAssertEqual(attestation, WitnessAttestation(rawValue: Data([0x42])))
+
+        sleeper.fireAll()                        // drain peerB's cancelled timer
+        fake.finishEvents()
+        while await iterator.next() != nil {}
+
         XCTAssertTrue(fake.disconnected.contains(peerA))
         XCTAssertTrue(fake.disconnected.contains(peerB))
     }
@@ -231,14 +239,21 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         )
 
         let stream = transport.runCapturer(session: mpcSession())
+        var iterator = stream.makeAsyncIterator()
+
         fake.emit(.peerConnected(peerA))
         await sleeper.awaitSleepers(count: 1)
         fake.emit(.dataReceived(peer: peerA, data: try frame([0x07])))
-        fake.finishEvents()
-        sleeper.fireAll()                        // stale timer — must be ignored
 
-        let received = await collect(stream)
-        XCTAssertEqual(received, [WitnessAttestation(rawValue: Data([0x07]))])
+        // Block until the attestation lands — the peer has now completed
+        // and its idle timer is cancelled before the stale fire below.
+        let attestation = await iterator.next()
+        XCTAssertEqual(attestation, WitnessAttestation(rawValue: Data([0x07])))
+
+        sleeper.fireAll()                        // stale timer — must be ignored
+        fake.finishEvents()
+        while await iterator.next() != nil {}
+
         XCTAssertEqual(fake.disconnected, [peerA])
     }
 
@@ -257,9 +272,12 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         await sleeper.awaitSleepers(count: 1)
         fake.emit(.peerDisconnected(peerA))
         fake.finishEvents()
+
+        // collect() drains the stream to completion — every event is
+        // processed and the loop has ended before the timer is fired.
+        let received = await collect(stream)
         sleeper.fireAll()
 
-        let received = await collect(stream)
         XCTAssertTrue(received.isEmpty)
         XCTAssertTrue(fake.disconnected.isEmpty)
     }
