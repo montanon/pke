@@ -80,7 +80,7 @@ public actor MPCWitnessTransport: WitnessTransport {
     /// Default idle-timer sleep — wraps `Task.sleep`. Returns early
     /// (without throwing) on cancellation so the timer task can exit
     /// cleanly during teardown.
-    static let defaultSleep: @Sendable (TimeInterval) async -> Void = { seconds in
+    public static let defaultSleep: @Sendable (TimeInterval) async -> Void = { seconds in
         try? await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000))
     }
 
