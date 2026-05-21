@@ -171,8 +171,15 @@ let package = Package(
         ),
         .testTarget(
             name: "PKEWitnessTests",
-            dependencies: ["PKEWitness"],
-            path: "PKETests/Witness"
+            dependencies: [
+                "PKEWitness",
+                "PKECrypto",
+                .product(name: "Crypto", package: "swift-crypto")
+            ],
+            path: "PKETests/Witness",
+            exclude: [
+                "MPC/two_device_test_plan.md"
+            ]
         ),
         .testTarget(
             name: "PKEHTTPClientTests",
