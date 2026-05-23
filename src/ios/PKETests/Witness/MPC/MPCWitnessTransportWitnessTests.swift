@@ -43,6 +43,9 @@ final class MPCWitnessTransportWitnessTests: XCTestCase {
 
         let first = Task { try await transport.runWitness(sign: signing.sign) }
         let second = Task { try await transport.runWitness(sign: signing.sign) }
+        // Both runWitness tasks call vendor.make() lazily once they enter
+        // the actor — wait until both channels exist before finishing them.
+        await poll { vendor.channels.count == 2 }
         for channel in vendor.channels {
             channel.finishEvents()
         }
