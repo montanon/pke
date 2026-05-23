@@ -150,14 +150,15 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         XCTAssertTrue(received.isEmpty)
     }
 
-    // runWitness is HLAM-159 — placeholder conformance contract.
-    func test_runWitness_throwsNotImplemented() async {
+    // runWitness on a capturer-only transport — see HLAM-159 witness
+    // tests for the full witness-flow coverage.
+    func test_runWitness_throwsWhenWitnessChannelUnavailable() async {
         let transport = MPCWitnessTransport { FakeMPCCapturerChannel() }
         do {
             try await transport.runWitness { _ in WitnessAttestation(rawValue: Data()) }
-            XCTFail("runWitness should throw witnessRoleNotImplemented")
+            XCTFail("runWitness should throw witnessChannelUnavailable")
         } catch {
-            XCTAssertEqual(error as? MPCWitnessTransportError, .witnessRoleNotImplemented)
+            XCTAssertEqual(error as? MPCWitnessTransportError, .witnessChannelUnavailable)
         }
     }
 
@@ -187,6 +188,11 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         fake.emit(.peerConnected(peerA))
         await sleeper.awaitSleepers(count: 1)
         sleeper.fireAll()                       // 5 seconds "elapse"
+        // The fired sleep yields `.idleTimeout` on a separate executor;
+        // wait for the disconnect to land before finishing events, else
+        // the forwarder may close the steps stream first and drop the
+        // timeout step (flaky on arm64 macOS).
+        await poll { fake.disconnected.contains(peerA) }
         fake.finishEvents()
 
         let received = await collect(stream)
@@ -296,6 +302,16 @@ private func mpcSession(
 
 private func frame(_ bytes: [UInt8]) throws -> Data {
     try MPCMessageFraming.encode(Data(bytes))
+}
+
+/// Yields the cooperative executor until `condition` holds, bounded so a
+/// genuine hang fails the test instead of spinning forever.
+private func poll(until condition: () -> Bool) async {
+    var iterations = 0
+    while !condition(), iterations < 100_000 {
+        await Task.yield()
+        iterations += 1
+    }
 }
 
 private func collect(_ stream: AsyncStream<WitnessAttestation>) async -> [WitnessAttestation] {
