@@ -150,15 +150,14 @@ final class MPCWitnessTransportCapturerTests: XCTestCase {
         XCTAssertTrue(received.isEmpty)
     }
 
-    // runWitness on a capturer-only transport — see HLAM-159 witness
-    // tests for the full witness-flow coverage.
-    func test_runWitness_throwsWhenWitnessChannelUnavailable() async {
+    // runWitness is HLAM-159 — placeholder conformance contract.
+    func test_runWitness_throwsNotImplemented() async {
         let transport = MPCWitnessTransport { FakeMPCCapturerChannel() }
         do {
             try await transport.runWitness { _ in WitnessAttestation(rawValue: Data()) }
-            XCTFail("runWitness should throw witnessChannelUnavailable")
+            XCTFail("runWitness should throw witnessRoleNotImplemented")
         } catch {
-            XCTAssertEqual(error as? MPCWitnessTransportError, .witnessChannelUnavailable)
+            XCTAssertEqual(error as? MPCWitnessTransportError, .witnessRoleNotImplemented)
         }
     }
 
